@@ -127,6 +127,21 @@
                         android:textSize="11sp"
                         android:textStyle="bold" />
                 </LinearLayout>
+
+                <!-- پیش‌نمایش پخش: فقط صدا، بدون خاموشی -->
+                <Button
+                    android:id="@+id/btnPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:backgroundTint="#FFFFFF"
+                    android:text="▶   پیش‌نمایش پخش"
+                    android:textColor="#6D28B8"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#B57FE4"
+                    app:strokeWidth="1.5dp" />
             </LinearLayout>
 
             <!-- کنترل‌ها -->

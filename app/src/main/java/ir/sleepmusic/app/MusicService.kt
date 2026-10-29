@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Build
@@ -21,6 +22,23 @@ class MusicService : Service() {
 
     private var player: MediaPlayer? = null
     private val tickHandler = Handler(Looper.getMainLooper())
+
+    // فوکوس صوتی: بعضی رام‌ها (مثل MIUI) بدون آن، صدا را درست مسیریابی نمی‌کنند
+    private val focusListener = AudioManager.OnAudioFocusChangeListener { }
+
+    private fun requestAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+            am.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
+        } catch (_: Exception) { }
+    }
+
+    private fun abandonAudioFocus() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+            am.abandonAudioFocus(focusListener)
+        } catch (_: Exception) { }
+    }
 
     // هر نیم ثانیه موقعیت پخش را به‌روزرسانی می‌کند تا رقص نور اپ زنده بماند
     private val ticker = object : Runnable {
@@ -44,6 +62,8 @@ class MusicService : Service() {
             stopSelf()
             return START_NOT_STICKY
         }
+        // حالت پیش‌نمایش: فقط پخش می‌کند؛ در پایان آهنگ خاموشی انجام نمی‌شود
+        previewMode = intent.getBooleanExtra(EXTRA_PREVIEW, false)
 
         createChannelAndStartForeground()
 
@@ -55,29 +75,45 @@ class MusicService : Service() {
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .build()
             )
-            setDataSource(this@MusicService, Uri.parse(uriString))
+            setVolume(1f, 1f)
             setWakeMode(this@MusicService, PowerManager.PARTIAL_WAKE_LOCK)
             setOnPreparedListener { mp ->
                 durationSec = mp.duration / 1000
                 positionSec = 0
                 audioSessionId = mp.audioSessionId
+                MusicService.isPreview = previewMode
                 MusicService.isPlaying = true
                 tickHandler.post(ticker)
+                requestAudioFocus()
+                mp.start()
             }
             setOnCompletionListener {
-                // پایان آهنگ: خاموشی (یا قفل صفحه)، بعد بستن سرویس
-                val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
-                ActionExecutor.execute(this@MusicService, prefs.getBoolean("power_menu", true))
+                // پایان آهنگ: در حالت عادی خاموشی (یا قفل صفحه)؛ در پیش‌نمایش فقط توقف
+                if (!previewMode) {
+                    val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
+                    ActionExecutor.execute(this@MusicService, prefs.getBoolean("power_menu", true))
+                }
                 stopEverything()
             }
-            setOnErrorListener { _, _, _ ->
+            setOnErrorListener { _, what, extra ->
+                Toast.makeText(
+                    this@MusicService,
+                    "پخش با خطا متوقف شد (کد " + what + "/" + extra + ")؛ آهنگ را دوباره انتخاب کن",
+                    Toast.LENGTH_LONG
+                ).show()
                 stopEverything()
                 true
             }
             try {
-                prepare()
-                start()
+                setDataSource(this@MusicService, Uri.parse(uriString))
+                // آماده‌سازی غیرمسدودکننده؛ start در OnPreparedListener انجام می‌شود
+                prepareAsync()
             } catch (_: Exception) {
+                Toast.makeText(
+                    this@MusicService,
+                    "دسترسی به فایل موسیقی ممکن نشد؛ لطفاً دوباره آهنگ را انتخاب کن",
+                    Toast.LENGTH_LONG
+                ).show()
                 stopEverything()
             }
         }
@@ -121,6 +157,7 @@ class MusicService : Service() {
     private fun stopEverything() {
         isPlaying = false
         tickHandler.removeCallbacks(ticker)
+        abandonAudioFocus()
         player?.run {
             try { stop() } catch (_: Exception) { }
             release()
@@ -135,6 +172,7 @@ class MusicService : Service() {
     override fun onDestroy() {
         isPlaying = false
         tickHandler.removeCallbacks(ticker)
+        abandonAudioFocus()
         player?.run {
             try { stop() } catch (_: Exception) { }
             release()
@@ -144,14 +182,18 @@ class MusicService : Service() {
         super.onDestroy()
     }
 
+    private var previewMode = false
+
     companion object {
         const val EXTRA_URI = "extra_uri"
+        const val EXTRA_PREVIEW = "extra_preview"
         const val ACTION_STOP = "action_stop"
         const val CHANNEL_ID = "music_playback"
         const val NOTIFICATION_ID = 1
 
         // وضعیت پخش برای نمایش زنده رقص نور در اکتیویتی
         @Volatile var isPlaying = false
+        @Volatile var isPreview = false
         @Volatile var positionSec = 0
         @Volatile var durationSec = 0
         @Volatile var audioSessionId = 0

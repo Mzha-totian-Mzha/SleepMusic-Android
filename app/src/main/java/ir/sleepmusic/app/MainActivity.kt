@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
@@ -42,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTimeElapsed: TextView
     private lateinit var tvTimeTotal: TextView
     private lateinit var tvPlayerStatus: TextView
+    private lateinit var btnPreview: Button
 
     // برای اینکه ویژوآلایزر فقط هنگام تغییر وضعیت وصل/قطع شود
     private var lastPlaying = false
@@ -87,6 +89,7 @@ class MainActivity : AppCompatActivity() {
         tvTimeElapsed = findViewById(R.id.tvTimeElapsed)
         tvTimeTotal = findViewById(R.id.tvTimeTotal)
         tvPlayerStatus = findViewById(R.id.tvPlayerStatus)
+        btnPreview = findViewById(R.id.btnPreview)
         equalizerView.setPlaying(false)
 
         // بازیابی تنظیمات ذخیره‌شده
@@ -126,6 +129,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnStart).setOnClickListener { startAction() }
         findViewById<Button>(R.id.btnStop).setOnClickListener { stopAction() }
         findViewById<Button>(R.id.btnTest).setOnClickListener { testAction() }
+        btnPreview.setOnClickListener { togglePreview() }
 
         findViewById<Button>(R.id.btnAccessibility).setOnClickListener { openAccessibilitySettings() }
         switchPowerMenu.setOnCheckedChangeListener { _, checked ->
@@ -150,6 +154,7 @@ class MainActivity : AppCompatActivity() {
         if (playing != lastPlaying) {
             lastPlaying = playing
             equalizerView.setPlaying(playing, MusicService.audioSessionId)
+            btnPreview.text = if (playing) "■   توقف پیش‌نمایش" else "▶   پیش‌نمایش پخش"
         }
         if (!playing) {
             tvPlayerStatus.text = "آماده برای پخش"
@@ -161,12 +166,13 @@ class MainActivity : AppCompatActivity() {
             tvTimeTotal.text = formatSecs(dur)
         }
         tvTimeElapsed.text = formatSecs(pos)
-        tvPlayerStatus.text = "در حال پخش…"
+        tvPlayerStatus.text = if (MusicService.isPreview) "در حال پیش‌نمایش…" else "در حال پخش…"
     }
 
     /** نام و مدت زمان فایل انتخاب‌شده را در کارت پلیر نشان می‌دهد */
     private fun updateMusicInfo(uri: Uri) {
-        val name = uri.lastPathSegment ?: "آهنگ انتخاب شد"
+        // فقط نام فایل را نشان می‌دهیم نه کل مسیر «primary:…» را
+        val name = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "آهنگ انتخاب شد"
         tvSelectedMusic.text = name
         tvPlayerStatus.text = "آماده برای پخش"
         tvTimeElapsed.text = "00:00"
@@ -232,6 +238,40 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "«خواب‌موزیک» را پیدا کن و سرویس «قفل صفحه هوشمند» را روشن کن", Toast.LENGTH_LONG).show()
     }
 
+    /** اگر ولوم رسانه (Media) صفر باشد، کاربر فکر می‌کند پخش خراب است */
+    private fun warnIfMuted() {
+        val am = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        try {
+            if (am.getStreamVolume(AudioManager.STREAM_MUSIC) == 0) {
+                Toast.makeText(
+                    this,
+                    "ولوم رسانه (Media) صفر است؛ با دکمه‌ی ولوم گوشی زیادش کن",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        } catch (_: Exception) { }
+    }
+
+    /** فقط پخش آهنگ بدون خاموشی؛ برای اینکه کاربر صدا را قبل از اجرای اصلی بشنود */
+    private fun togglePreview() {
+        if (MusicService.isPlaying) {
+            stopService(Intent(this, MusicService::class.java))
+            Toast.makeText(this, "پیش‌نمایش متوقف شد", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val uri = prefs.getString("music_uri", null)
+        if (uri == null) {
+            Toast.makeText(this, "اول یک آهنگ انتخاب کن", Toast.LENGTH_SHORT).show()
+            return
+        }
+        warnIfMuted()
+        val intent = Intent(this, MusicService::class.java)
+        intent.putExtra(MusicService.EXTRA_URI, uri)
+        intent.putExtra(MusicService.EXTRA_PREVIEW, true)
+        ContextCompat.startForegroundService(this, intent)
+        Toast.makeText(this, "پیش‌نمایش پخش؛ در پایان آهنگ هیچ خاموشی انجام نمی‌شود", Toast.LENGTH_LONG).show()
+    }
+
     private fun startAction() {
         val mode = if (radioGroup.checkedRadioButtonId == R.id.radioScheduled) "scheduled" else "after_music"
         if (mode == "after_music") {
@@ -242,6 +282,7 @@ class MainActivity : AppCompatActivity() {
             }
             val intent = Intent(this, MusicService::class.java)
             intent.putExtra(MusicService.EXTRA_URI, uri)
+            warnIfMuted()
             ContextCompat.startForegroundService(this, intent)
             Toast.makeText(this, "پخش شروع شد؛ درست بعد از پایان آهنگ گوشی خاموش می‌شود", Toast.LENGTH_LONG).show()
         } else {
