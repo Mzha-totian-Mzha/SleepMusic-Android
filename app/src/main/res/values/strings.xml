@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">خواب‌موزیک</string>
+    <string name="accessibility_label">قفل صفحه هوشمند</string>
+    <string name="accessibility_description">این سرویس فقط دو کار انجام می‌دهد: قفل کردن صفحه و (در صورت فعال بودن) باز کردن منوی خاموشی و لمس دکمه خاموش کردن بعد از پایان موسیقی. هیچ داده‌ای خوانده یا ذخیره نمی‌شود.</string>
+</resources>
