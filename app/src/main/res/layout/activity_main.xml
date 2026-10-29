@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="#EFE8FA">
+    android:background="#F2EBFB">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -18,13 +18,13 @@
             android:background="@drawable/bg_header"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingTop="20dp"
-            android:paddingBottom="22dp">
+            android:paddingTop="22dp"
+            android:paddingBottom="26dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="خواب‌موزیک"
+                android:text="🌙  خواب‌موزیک"
                 android:textColor="#FFFFFF"
                 android:textSize="24sp"
                 android:textStyle="bold" />
@@ -32,10 +32,10 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
-                android:text="موسیقی تا خاموشی"
+                android:layout_marginTop="4dp"
+                android:text="موسیقی پخش می‌شه، وقتی تموم شد گوشی خودش خاموش می‌شه"
                 android:textColor="#F0E3FB"
-                android:textSize="13sp"
+                android:textSize="12sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -51,13 +51,25 @@
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="8dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#F3EBFB"
+                        android:gravity="center"
+                        android:lineSpacingExtra="0dp"
+                        android:padding="6dp"
+                        android:text="🎵"
+                        android:textSize="13sp" />
 
                     <TextView
                         android:id="@+id/tvSelectedMusic"
@@ -85,7 +97,7 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- رقص نور: اکولایزر زنده به‌جای نوار خطی -->
+                <!-- رقص نور: موج پیوسته روی سفید، مثل عکس مرجع -->
                 <ir.sleepmusic.app.EqualizerView
                     android:id="@+id/equalizerView"
                     android:layout_width="match_parent"
@@ -128,89 +140,221 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <!-- پیش‌نمایش پخش: فقط صدا، بدون خاموشی -->
+                <!-- پخش: فقط صدا، بدون خاموشی -->
                 <Button
                     android:id="@+id/btnPreview"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
-                    android:backgroundTint="#FFFFFF"
-                    android:text="▶   پیش‌نمایش پخش"
+                    android:layout_height="46dp"
+                    android:layout_marginTop="12dp"
+                    android:backgroundTint="#F3EBFB"
+                    android:insetTop="0dp"
+                    android:insetBottom="0dp"
+                    android:text="▶   پخش"
                     android:textColor="#6D28B8"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textStyle="bold"
-                    app:cornerRadius="12dp"
-                    app:strokeColor="#B57FE4"
-                    app:strokeWidth="1.5dp" />
+                    app:cornerRadius="14dp" />
             </LinearLayout>
 
-            <!-- کنترل‌ها -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp"
-                android:text="کنترل‌ها"
-                android:textColor="#7E3FC0"
-                android:textSize="13sp"
-                android:textStyle="bold" />
-
-            <Button
-                android:id="@+id/btnPickMusic"
+            <!-- راه‌اندازی اولیه: سه قدم لازم برای خاموشی خودکار -->
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:backgroundTint="#FFFFFF"
-                android:text="انتخاب فایل موسیقی   ‹"
-                android:textColor="#6D28B8"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                app:cornerRadius="14dp"
-                app:strokeColor="#B57FE4"
-                app:strokeWidth="1.5dp" />
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="16dp">
 
-            <Button
-                android:id="@+id/btnAccessibility"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:backgroundTint="#FFFFFF"
-                android:text="دسترسی‌پذیری (Accessibility)   ‹"
-                android:textColor="#6D28B8"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                app:cornerRadius="14dp"
-                app:strokeColor="#B57FE4"
-                app:strokeWidth="1.5dp" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btnTest"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:backgroundTint="#FFFFFF"
-                android:text="تست خاموش شدن"
-                android:textColor="#E65100"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                app:cornerRadius="14dp"
-                app:strokeColor="#F57C00"
-                app:strokeWidth="1.5dp" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="راه‌اندازی اولیه"
+                        android:textColor="#2A1840"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvWizardProgress"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="۳ قدم مانده"
+                        android:textColor="#8E4FD0"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="برای اینکه خاموشی خودکار بی‌دردسر انجام بشه، این سه قدم رو یک‌بار انجام بده:"
+                    android:textColor="#9C8DB5"
+                    android:textSize="10sp" />
+
+                <!-- قدم ۱: شروع خودکار -->
+                <LinearLayout
+                    android:id="@+id/stepAutostart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/bg_card_soft"
+                    android:gravity="center_vertical"
+                    android:minHeight="44dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:id="@+id/tvStepAutostartBadge"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۱"
+                        android:textColor="#6D28B8"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="شروع خودکار (Autostart)"
+                        android:textColor="#2A1840"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStepAutostartState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- قدم ۲: باتری -->
+                <LinearLayout
+                    android:id="@+id/stepBattery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_soft"
+                    android:gravity="center_vertical"
+                    android:minHeight="44dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:id="@+id/tvStepBatteryBadge"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۲"
+                        android:textColor="#6D28B8"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="محدود نکردن مصرف باتری"
+                        android:textColor="#2A1840"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStepBatteryState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- قدم ۳: دسترس‌پذیری -->
+                <LinearLayout
+                    android:id="@+id/stepAccessibility"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_card_soft"
+                    android:gravity="center_vertical"
+                    android:minHeight="44dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="10dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="10dp">
+
+                    <TextView
+                        android:id="@+id/tvStepAccessibilityBadge"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۳"
+                        android:textColor="#6D28B8"
+                        android:textSize="13sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:text="سرویس «قفل صفحه هوشمند»"
+                        android:textColor="#2A1840"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/tvStepAccessibilityState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="11sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
 
             <!-- حالت خاموشی -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="حالت خاموشی"
                     android:textColor="#2A1840"
-                    android:textSize="13sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
 
                 <RadioGroup
@@ -226,15 +370,18 @@
                         android:layout_height="wrap_content"
                         android:buttonTint="#8E4FD0"
                         android:checked="true"
+                        android:minHeight="40dp"
                         android:text="بلافاصله بعد از پایان موسیقی"
                         android:textColor="#2A1840"
-                        android:textSize="12sp" />
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
 
                     <RadioButton
                         android:id="@+id/radioScheduled"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:buttonTint="#8E4FD0"
+                        android:minHeight="40dp"
                         android:text="در ساعت مشخص (پشتیبان)"
                         android:textColor="#7A6A93"
                         android:textSize="12sp" />
@@ -253,13 +400,12 @@
                         android:layout_height="wrap_content"
                         android:layout_marginEnd="6dp"
                         android:layout_weight="1"
-                        android:backgroundTint="#FFFFFF"
+                        android:backgroundTint="#F3EBFB"
                         android:text="انتخاب ساعت"
                         android:textColor="#6D28B8"
                         android:textSize="12sp"
-                        app:cornerRadius="14dp"
-                        app:strokeColor="#B57FE4"
-                        app:strokeWidth="1.5dp" />
+                        android:textStyle="bold"
+                        app:cornerRadius="14dp" />
 
                     <TextView
                         android:id="@+id/tvScheduledTime"
@@ -278,10 +424,10 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="12dp"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchPowerMenu"
@@ -290,14 +436,15 @@
                     android:checked="true"
                     android:text="خاموشی واقعی بدون روت (منوی خاموشی)"
                     android:textColor="#2A1840"
-                    android:textSize="12sp" />
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
 
                 <TextView
                     android:id="@+id/tvPowerMenuHint"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:text="اپ منوی خاموشی را باز می‌کند و خودش روی «خاموش کردن» کلیک می‌کند؛ اگر رام اجازه ندهد، صفحه قفل می‌شود."
+                    android:text="در پایان موسیقی، منوی خاموشی گوشی باز می‌شه و اپ خودش روی «خاموش کردن» کلیک می‌کنه؛ اگر رام اجازه نده، صفحه قفل می‌شه."
                     android:textColor="#9C8DB5"
                     android:textSize="10sp" />
             </LinearLayout>
@@ -320,46 +467,28 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
-                android:text="بعد از پایان موسیقی، گوشی خاموش می‌شود"
+                android:text="همین حالا پخش می‌کنه و درست بعد از پایان آهنگ، گوشی خاموش می‌شه"
                 android:textColor="#9C8DB5"
                 android:textSize="11sp" />
 
             <Button
                 android:id="@+id/btnStop"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
+                android:layout_height="46dp"
                 android:layout_marginTop="10dp"
-                android:backgroundTint="#FFFFFF"
+                android:backgroundTint="#FDEEE0"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
                 android:text="توقف پخش"
                 android:textColor="#E65100"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="14dp"
-                app:strokeColor="#F57C00"
-                app:strokeWidth="1.5dp" />
-
-            <!-- نکته شیائومی -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="14dp"
-                android:background="@drawable/bg_card_soft"
-                android:orientation="vertical"
-                android:padding="12dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:lineSpacingExtra="3dp"
-                    android:text="🔋  برای عملکرد صحیح روی شیائومی: «شروع خودکار» را فعال کن، صرفه‌جویی باتری را «بدون محدودیت» بگذار و بعد «تست خاموش شدن» را امتحان کن."
-                    android:textColor="#7A6A93"
-                    android:textSize="11sp" />
-            </LinearLayout>
+                app:cornerRadius="14dp" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="14dp"
                 android:gravity="center"
                 android:text="خواب‌موزیک • برای شب‌های آرام 🌙"
                 android:textColor="#B3A6CC"

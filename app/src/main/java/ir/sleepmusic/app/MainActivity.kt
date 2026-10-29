@@ -4,10 +4,12 @@ import android.Manifest
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.app.TimePickerDialog
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.media.AudioManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -15,6 +17,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.View
 import android.widget.Button
@@ -44,6 +47,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTimeTotal: TextView
     private lateinit var tvPlayerStatus: TextView
     private lateinit var btnPreview: Button
+    private lateinit var tvWizardProgress: TextView
+
+    // وقتی به تنظیمات «شروع خودکار» رفتیم، بعد از برگشتن قدم را «انجام‌شده» علامت می‌زنیم
+    private var waitingAutostart = false
 
     // برای اینکه ویژوآلایزر فقط هنگام تغییر وضعیت وصل/قطع شود
     private var lastPlaying = false
@@ -90,6 +97,7 @@ class MainActivity : AppCompatActivity() {
         tvTimeTotal = findViewById(R.id.tvTimeTotal)
         tvPlayerStatus = findViewById(R.id.tvPlayerStatus)
         btnPreview = findViewById(R.id.btnPreview)
+        tvWizardProgress = findViewById(R.id.tvWizardProgress)
         equalizerView.setPlaying(false)
 
         // بازیابی تنظیمات ذخیره‌شده
@@ -128,19 +136,29 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.btnStart).setOnClickListener { startAction() }
         findViewById<Button>(R.id.btnStop).setOnClickListener { stopAction() }
-        findViewById<Button>(R.id.btnTest).setOnClickListener { testAction() }
         btnPreview.setOnClickListener { togglePreview() }
 
-        findViewById<Button>(R.id.btnAccessibility).setOnClickListener { openAccessibilitySettings() }
+        // راه‌اندازی اولیه: سه قدم، پشت سر هم
+        findViewById<View>(R.id.stepAutostart).setOnClickListener { openAutostartSettings() }
+        findViewById<View>(R.id.stepBattery).setOnClickListener { openBatterySettings() }
+        findViewById<View>(R.id.stepAccessibility).setOnClickListener { openAccessibilitySettings() }
+
         switchPowerMenu.setOnCheckedChangeListener { _, checked ->
             prefs.edit().putBoolean("power_menu", checked).apply()
         }
+
+        maybeStartWizard()
     }
 
     override fun onResume() {
         super.onResume()
+        if (waitingAutostart) {
+            waitingAutostart = false
+            // وضعیت Autostart از بیرون قابل خواندن نیست؛ بازدید کاربر = انجام شد
+            prefs.edit().putBoolean("autostart_done", true).apply()
+        }
+        refreshWizardUi()
         uiHandler.post(ticker)
-        refreshAccessibilityUi()
     }
 
     override fun onPause() {
@@ -154,7 +172,7 @@ class MainActivity : AppCompatActivity() {
         if (playing != lastPlaying) {
             lastPlaying = playing
             equalizerView.setPlaying(playing, MusicService.audioSessionId)
-            btnPreview.text = if (playing) "■   توقف پیش‌نمایش" else "▶   پیش‌نمایش پخش"
+            btnPreview.text = if (playing) "■   توقف" else "▶   پخش"
         }
         if (!playing) {
             tvPlayerStatus.text = "آماده برای پخش"
@@ -166,7 +184,7 @@ class MainActivity : AppCompatActivity() {
             tvTimeTotal.text = formatSecs(dur)
         }
         tvTimeElapsed.text = formatSecs(pos)
-        tvPlayerStatus.text = if (MusicService.isPreview) "در حال پیش‌نمایش…" else "در حال پخش…"
+        tvPlayerStatus.text = "در حال پخش…"
     }
 
     /** نام و مدت زمان فایل انتخاب‌شده را در کارت پلیر نشان می‌دهد */
@@ -211,31 +229,120 @@ class MainActivity : AppCompatActivity() {
     /** آیا سرویس دسترس‌پذیری فعال است؟ */
     private fun accessibilityEnabled(): Boolean = LockAccessibilityService.instance != null
 
-    /** دکمه دسترس‌پذیری فقط تا وقتی نشان داده می‌شود که سرویس فعال نشده باشد */
-    private fun refreshAccessibilityUi() {
-        findViewById<Button>(R.id.btnAccessibility).visibility =
-            if (accessibilityEnabled()) View.GONE else View.VISIBLE
+    /** قدم Autostart قابل خواندن نیست؛ با بازدید کاربر علامت می‌خورد */
+    private fun autostartDone(): Boolean = prefs.getBoolean("autostart_done", false)
+
+    /** قدم باتری: وضعیت واقعی از PowerManager خوانده می‌شود */
+    private fun batteryDone(): Boolean {
+        return try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            pm.isIgnoringBatteryOptimizations(packageName)
+        } catch (_: Exception) {
+            false
+        }
     }
 
-    /** بار اول اجرا: با یک توضیح ساده، خودکار به تنظیمات دسترس‌پذیری می‌رویم */
-    private fun maybePromptAccessibility() {
-        if (accessibilityEnabled()) return
-        if (prefs.getBoolean("a11y_prompted", false)) return
-        prefs.edit().putBoolean("a11y_prompted", true).apply()
+    /** کارت راه‌اندازی: وضعیت سه قدم را تازه می‌کند */
+    private fun refreshWizardUi() {
+        val steps = listOf(
+            Triple(R.id.tvStepAutostartBadge, R.id.tvStepAutostartState, autostartDone()),
+            Triple(R.id.tvStepBatteryBadge, R.id.tvStepBatteryState, batteryDone()),
+            Triple(R.id.tvStepAccessibilityBadge, R.id.tvStepAccessibilityState, accessibilityEnabled())
+        )
+        val numbers = listOf("۱", "۲", "۳")
+        var remaining = 0
+        for (i in steps.indices) {
+            val (badgeId, stateId, done) = steps[i]
+            val badge = findViewById<TextView>(badgeId)
+            val state = findViewById<TextView>(stateId)
+            if (done) {
+                badge.text = "✓"
+                badge.backgroundTintList = ColorStateList.valueOf(0xFFDFF3E7.toInt())
+                badge.setTextColor(0xFF1E7B45.toInt())
+                state.text = "انجام شد ✓"
+                state.setTextColor(0xFF1E7B45.toInt())
+            } else {
+                remaining++
+                badge.text = numbers[i]
+                badge.backgroundTintList = ColorStateList.valueOf(0xFFEFE4FA.toInt())
+                badge.setTextColor(0xFF6D28B8.toInt())
+                state.text = "تنظیم   ‹"
+                state.setTextColor(0xFF8E4FD0.toInt())
+            }
+        }
+        tvWizardProgress.text = if (remaining == 0) "همه‌چیز آماده‌ست ✓" else "" + remaining + " قدم مانده"
+    }
+
+    /** بار اول اجرا: با یک توضیح ساده، قدم اول راه‌اندازی را شروع می‌کنیم */
+    private fun maybeStartWizard() {
+        if (autostartDone() && batteryDone() && accessibilityEnabled()) return
+        if (prefs.getBoolean("wizard_prompted", false)) return
+        prefs.edit().putBoolean("wizard_prompted", true).apply()
         androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("فقط یک قدم مانده!")
+            .setTitle("سه قدم تا آماده شدن 🌙")
             .setMessage(
-                "برای اینکه بعد از پایان موسیقی گوشی خودش خاموش شود، باید سرویس «قفل صفحه هوشمند» فعال شود. " +
-                    "در صفحه بعدی «خواب‌موزیک» را پیدا کن و روشنش کن. این سرویس فقط منوی خاموشی را باز می‌کند و هیچ داده‌ای نمی‌خواند."
+                "برای اینکه خاموشی خودکار درست کار کنه، سه قدم ساده لازمه:\n" +
+                    "۱) شروع خودکار\n۲) محدود نکردن مصرف باتری\n۳) سرویس دسترس‌پذیری\n\n" +
+                    "هر قدم رو که انجام بدی تیک می‌خوره و خودت می‌ری سراغ قدم بعدی. الان شروع کنیم؟"
             )
-            .setPositiveButton("بریم فعال کنیم") { _, _ -> openAccessibilitySettings() }
+            .setPositiveButton("بریم") { _, _ -> openAutostartSettings() }
             .setNegativeButton("بعداً", null)
             .show()
     }
 
+    /** قدم ۱: صفحه‌ی شروع خودکار MIUI (اگر نبود، جزئیات اپ) */
+    private fun openAutostartSettings() {
+        waitingAutostart = true
+        Toast.makeText(this, "«شروع خودکار» خواب‌موزیک را روشن کن", Toast.LENGTH_LONG).show()
+        try {
+            val intent = Intent()
+            intent.component = ComponentName(
+                "com.miui.securitycenter",
+                "com.miui.permcenter.autostart.AutoStartManagementActivity"
+            )
+            startActivity(intent)
+        } catch (_: Exception) {
+            try {
+                startActivity(
+                    Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.parse("package:" + packageName)
+                    )
+                )
+            } catch (_: Exception) {
+                waitingAutostart = false
+                Toast.makeText(this, "صفحه‌ی شروع خودکار پیدا نشد؛ از تنظیمات گوشی فعالش کن", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** قدم ۲: درخواست «بدون محدودیت» باتری */
+    private fun openBatterySettings() {
+        if (batteryDone()) {
+            Toast.makeText(this, "باتری از قبل بدون محدودیت است", Toast.LENGTH_SHORT).show()
+            return
+        }
+        Toast.makeText(this, "گزینه‌ی «اجازه» را بزن تا باتری محدودت نکند", Toast.LENGTH_LONG).show()
+        try {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:" + packageName)
+                )
+            )
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+            } catch (_: Exception) {
+                Toast.makeText(this, "صفحه‌ی باتری پیدا نشد", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /** قدم ۳: سرویس دسترس‌پذیری */
     private fun openAccessibilitySettings() {
-        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         Toast.makeText(this, "«خواب‌موزیک» را پیدا کن و سرویس «قفل صفحه هوشمند» را روشن کن", Toast.LENGTH_LONG).show()
+        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
     }
 
     /** اگر ولوم رسانه (Media) صفر باشد، کاربر فکر می‌کند پخش خراب است */
@@ -256,7 +363,7 @@ class MainActivity : AppCompatActivity() {
     private fun togglePreview() {
         if (MusicService.isPlaying) {
             stopService(Intent(this, MusicService::class.java))
-            Toast.makeText(this, "پیش‌نمایش متوقف شد", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "پخش متوقف شد", Toast.LENGTH_SHORT).show()
             return
         }
         val uri = prefs.getString("music_uri", null)
@@ -269,7 +376,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra(MusicService.EXTRA_URI, uri)
         intent.putExtra(MusicService.EXTRA_PREVIEW, true)
         ContextCompat.startForegroundService(this, intent)
-        Toast.makeText(this, "پیش‌نمایش پخش؛ در پایان آهنگ هیچ خاموشی انجام نمی‌شود", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "پخش شروع شد؛ در پایان آهنگ هیچ خاموشی انجام نمی‌شود", Toast.LENGTH_LONG).show()
     }
 
     private fun startAction() {
@@ -334,12 +441,5 @@ class MainActivity : AppCompatActivity() {
         )
         alarmManager.cancel(pendingIntent)
         Toast.makeText(this, "همه‌چیز متوقف شد", Toast.LENGTH_SHORT).show()
-    }
-
-    private fun testAction() {
-        Toast.makeText(this, "۵ ثانیه دیگر تست خاموشی اجرا می‌شود...", Toast.LENGTH_SHORT).show()
-        Handler(Looper.getMainLooper()).postDelayed({
-            ActionExecutor.execute(this, prefs.getBoolean("power_menu", true))
-        }, 5000)
     }
 }

@@ -17,10 +17,10 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 /**
- * ویژوالایزر «موج پیوسته‌ی گرادیانی» (Continuous Gradient Waveform) مطابق عکس مرجع:
+ * ویژوالایزر «موج پیوسته‌ی گرادیانی» (Continuous Gradient Waveform) روی پس‌زمینه‌ی سفید،
+ * دقیقاً مثل عکس مرجع: بدون قاب تیره، بدون هسته‌ی سفید؛ فقط موج رنگی:
  * - نه میله و نه فاصله؛ ستون‌های چسبیده به هم + هموارسازی دوبل → موج نرم و یکپارچه
- * - گرادیان شفق قطبی (Aurora) در طول موج: بنفش کمرنگ → آبی فیروزه‌ای → سبز زمردی ملایم
- * - هاله‌ی نور (Glow) و هسته‌ی سفید درخشان روی محور وسط مثل عکس مرجع
+ * - گرادیان شفق قطبی (Aurora) در طول موج: بنفش → فیروزه‌ای → سبز، با لبه‌های نرم و محو
  * - حرکت با هموارسازی زمانی به خودِ صدای موسیقی چسبیده و روان است
  * از Visualizer اندروید استفاده می‌کند (فقط تحلیل زنده موج؛ هیچ صدایی ضبط یا ذخیره نمی‌شود).
  * اگر مجوز یا دیتای ویژوآلایزر نبود، خودش با یک موج آرام و نرم نفس می‌کشد.
@@ -47,8 +47,6 @@ class EqualizerView @JvmOverloads constructor(
 
     private val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val corePaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val coreGlowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val wavePath = Path()
 
     private val current = FloatArray(POINTS) // ارتفاع هموارشده‌ی فعلی هر ستون
@@ -62,8 +60,7 @@ class EqualizerView @JvmOverloads constructor(
     private var shaderWidth = -1
 
     init {
-        glowPaint.maskFilter = BlurMaskFilter(14f, BlurMaskFilter.Blur.NORMAL)
-        coreGlowPaint.maskFilter = BlurMaskFilter(16f, BlurMaskFilter.Blur.NORMAL)
+        glowPaint.maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
     }
 
     private val animator = object : Runnable {
@@ -182,31 +179,19 @@ class EqualizerView @JvmOverloads constructor(
         val maxHalf = h * 0.40f
         val colW = w / POINTS
 
-        // ۱) لایه‌ی هاله‌ی نور (Glow): موجِ محو و کمی پهن‌تر → لبه‌های نرم و محو مثل عکس مرجع
+        // ۱) لایه‌ی لبه‌ی نرم (Glow): موجِ محو و کمی پهن‌تر → لبه‌ها روی سفید نرم و محو دیده می‌شوند
         buildWavePath(w, mid, maxHalf, expand = h * 0.02f)
-        glowPaint.alpha = 105
+        glowPaint.alpha = 70
         canvas.drawPath(wavePath, glowPaint)
 
         // ۲) بدنه‌ی موج پیوسته: ستون‌های چسبیده به هم، بدون هیچ فاصله‌ای
-        var ampSum = 0f
         var x = 0f
         for (i in 0 until POINTS) {
             val c = current[i].coerceIn(0.03f, 1f)
-            ampSum += c
             val half = maxHalf * c
             canvas.drawRect(x, mid - half, x + colW, mid + half, bodyPaint)
             x += colW
         }
-
-        // ۳) هسته‌ی سفید ملایم روی محور وسط؛ شدتش با انرژی لحظه‌ای موج نفس می‌کشد
-        val energy = (ampSum / POINTS).coerceIn(0f, 1f)
-        val coreAlpha = (130 + 90 * energy).toInt().coerceIn(0, 255)
-        coreGlowPaint.color = 0xFFFFFFFF.toInt()
-        coreGlowPaint.alpha = (coreAlpha * 0.55f).toInt()
-        canvas.drawRect(0f, mid - h * 0.07f, w, mid + h * 0.07f, coreGlowPaint)
-        corePaint.color = 0xFFFFFFFF.toInt()
-        corePaint.alpha = coreAlpha
-        canvas.drawRect(0f, mid - h * 0.012f, w, mid + h * 0.012f, corePaint)
     }
 
     /** ساخت مسیر بسته‌ی موج (لبه‌ی قرینه‌ی بالا و پایین) برای هاله‌ی نرم */
