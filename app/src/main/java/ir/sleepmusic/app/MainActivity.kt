@@ -30,6 +30,9 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import org.json.JSONArray
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /**
  * صفحه اصلی — دقیقاً مطابق طراحی تأییدشده:
@@ -740,7 +743,7 @@ class MainActivity : AppCompatActivity() {
     private fun showAlert(remainingMs: Int) {
         if (isFinishing || isDestroyed) return
         if (alertDialog != null && alertDialog!!.isShowing) return
-        val dialog = AlertDialog.Builder(this, R.style.Theme.SleepMusic).create()
+        val dialog = AlertDialog.Builder(this, R.style.Theme_SleepMusic).create()
         dialog.setContentView(R.layout.dialog_alert)
         dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setLayout(
@@ -760,11 +763,11 @@ class MainActivity : AppCompatActivity() {
         }
         alertAnimator?.start()
 
-        dialog.findViewById<TextView>(R.id.btnAlertCancel).setOnClickListener {
+        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.setOnClickListener {
             dismissAlert()
             startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_CANCEL_SHUTDOWN))
         }
-        dialog.findViewById<TextView>(R.id.btnAlertNow).setOnClickListener {
+        dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setOnClickListener {
             dismissAlert()
             startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_SHUTDOWN_NOW))
         }
@@ -798,10 +801,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun buildStatsDots(streak: Int) {
         statsDots.removeAllViews()
-        val letters = mapOf(
+        val letters: Map<Int, String> = mapOf(
             7 to "ش", 1 to "ی", 2 to "د", 3 to "س", 4 to "چ", 5 to "پ", 6 to "ج"
         )
-        val fmt = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val today = midnight(Calendar.getInstance())
         var lastDay: Calendar? = null
         val lastRaw = prefs.getString("last_success_day", "")
