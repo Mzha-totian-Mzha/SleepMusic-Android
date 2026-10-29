@@ -28,6 +28,11 @@
             </intent-filter>
         </activity>
 
+        <!-- راه‌اندازی اولیه: بار اول، قبل از ورود به صفحه‌ی اصلی -->
+        <activity
+            android:name=".OnboardingActivity"
+            android:exported="false" />
+
         <!-- سرویس پخش موسیقی در پس‌زمینه -->
         <service
             android:name=".MusicService"

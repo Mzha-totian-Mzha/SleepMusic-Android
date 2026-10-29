@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#F2EBFB">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- هدر یاسی -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_header"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingTop="24dp"
+            android:paddingBottom="28dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🌙  راه‌اندازی اولیه"
+                android:textColor="#FFFFFF"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:layout_marginStart="24dp"
+                android:layout_marginEnd="24dp"
+                android:gravity="center"
+                android:text="فقط بار اول؛ سه قدم ساده برای اینکه خاموشی خودکار درست کار کنه"
+                android:textColor="#F0E3FB"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- کارت قدم‌ها -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvOnboardHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="۳ قدم مانده؛ هر قدم که تموم شد خودش می‌ره قدم بعدی"
+                    android:textColor="#8E4FD0"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <!-- قدم ۱: شروع خودکار -->
+                <LinearLayout
+                    android:id="@+id/stepAutostart"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_card_soft"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="52dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/tvStepAutostartBadge"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۱"
+                        android:textColor="#6D28B8"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="شروع خودکار (Autostart)"
+                            android:textColor="#2A1840"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="اجازه بده برنامه بعد از ری‌استارت هم کار کنه"
+                            android:textColor="#9C8DB5"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvStepAutostartState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- قدم ۲: باتری -->
+                <LinearLayout
+                    android:id="@+id/stepBattery"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:alpha="0.45"
+                    android:background="@drawable/bg_card_soft"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="52dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/tvStepBatteryBadge"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۲"
+                        android:textColor="#6D28B8"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="محدود نکردن مصرف باتری"
+                            android:textColor="#2A1840"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="تا پخش موسیقی وسط راه قطع نشه"
+                            android:textColor="#9C8DB5"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvStepBatteryState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <!-- قدم ۳: دسترس‌پذیری -->
+                <LinearLayout
+                    android:id="@+id/stepAccessibility"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:alpha="0.45"
+                    android:background="@drawable/bg_card_soft"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:gravity="center_vertical"
+                    android:minHeight="52dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingTop="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/tvStepAccessibilityBadge"
+                        android:layout_width="30dp"
+                        android:layout_height="30dp"
+                        android:background="@drawable/bg_step_circle"
+                        android:backgroundTint="#EFE4FA"
+                        android:gravity="center"
+                        android:text="۳"
+                        android:textColor="#6D28B8"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="سرویس «قفل صفحه هوشمند»"
+                            android:textColor="#2A1840"
+                            android:textSize="13sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="همین سرویس آخر کار گوشی را خاموش می‌کند"
+                            android:textColor="#9C8DB5"
+                            android:textSize="10sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvStepAccessibilityState"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="تنظیم   ‹"
+                        android:textColor="#8E4FD0"
+                        android:textSize="12sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- دکمه ورود (بعد از اتمام هر سه قدم ظاهر می‌شود) -->
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btnEnter"
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_gradient_primary"
+                android:stateListAnimator="@null"
+                android:text="ورود به برنامه  🌙"
+                android:textColor="#FFFFFF"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- رد کردن برای مواقع اضطراری -->
+            <TextView
+                android:id="@+id/tvSkip"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:gravity="center"
+                android:padding="8dp"
+                android:text="رد کردن و ورود بدون تنظیم (بعداً)"
+                android:textColor="#9C8DB5"
+                android:textSize="11sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="این تنظیم‌ها فقط یک‌بار درخواست می‌شن"
+                android:textColor="#B3A6CC"
+                android:textSize="10sp" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

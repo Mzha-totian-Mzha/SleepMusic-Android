@@ -2,10 +2,12 @@ package ir.sleepmusic.app
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.graphics.Path
 import android.graphics.Rect
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -14,19 +16,27 @@ class LockAccessibilityService : AccessibilityService() {
     companion object {
         var instance: LockAccessibilityService? = null
 
-        // وقتی true باشد، یعنی در حال جستجوی دکمه خاموش کردن در منوی سیستم هستیم
+        // وقتی true باشد، یعنی در حال کار روی منوی خاموشی سیستم هستیم
         @Volatile
         var powerMenuPending = false
 
-        // عنوان دکمه خاموش کردن در زبان‌های مختلف (فارسی/انگلیسی/عربی/چینی)
+        // کلیدواژه‌های دکمه/برچسب خاموشی در زبان‌های مختلف
         private val POWER_OFF_KEYWORDS = listOf(
             "خاموش کردن", "خاموشی", "خاموشي", "خاموش",
-            "power off", "shut down", "shutdown", "power",
+            "power off", "shut down", "shutdown", "turn off",
             "إيقاف التشغيل", "ايقاف التشغيل", "关机"
+        )
+
+        // کلیدواژه‌های دیالوگ تأیید (بعضی رام‌ها بعد از خاموشی، تأیید می‌خواهند)
+        private val CONFIRM_KEYWORDS = listOf(
+            "خاموش کردن", "power off", "shut down", "turn off",
+            "تأیید", "تایید", "بله", "yes", "ok"
         )
     }
 
     private val handler = Handler(Looper.getMainLooper())
+    private var lastAttemptAt = 0L
+    private var scanCount = 0
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -34,10 +44,12 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // هر وقت پنجره‌ای از سیستم (SystemUI) باز شد و منتظر منوی خاموشی بودیم، دنبال دکمه بگرد
-        if (powerMenuPending && event?.packageName?.toString() == "com.android.systemui") {
-            scanAndClick()
-        }
+        if (!powerMenuPending) return
+        // به‌محض باز شدن پنجره‌ی منوی پاور (SystemUI) تلاش زودهنگام می‌کنیم
+        if (event?.packageName?.toString() != "com.android.systemui") return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastAttemptAt < 800) return
+        tryScan()
     }
 
     override fun onInterrupt() { }
@@ -48,17 +60,21 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * خاموشی واقعی بدون روت:
-     * ۱) اگر صفحه خاموش است، اول آن را بیدار می‌کنیم
-     * ۲) منوی خاموشی سیستم را باز می‌کنیم
-     * ۳) خودمان روی دکمه «خاموش کردن» کلیک می‌کنیم:
-     *     - اول خودِ نود، بعد والدِ کلیک‌پذیر، و در نهایت ضربه‌ی لمسی (Gesture) روی مختصات دکمه
-     *     - چون روی MIUI بعضی دکمه‌ها کلیک استاندارد accessibility را به accessibility نمی‌دهند
-     * ۴) اگر تا ۸ ثانیه دکمه پیدا نشد، به‌جایش صفحه را قفل می‌کنیم (حالت جایگزین امن)
+     * خاموشی واقعی بدون روت — سازگار با منوی دکمه‌ای و منوی کشیدنی (HyperOS):
+     * ۱) اگر صفحه خاموش است، اول بیدارش می‌کنیم
+     * ۲) منوی پاور را باز می‌کنیم
+     * ۳) چند بار در فواصل زمانی جستجو می‌کنیم:
+     *    الف) اگر دکمه‌ی واقعی «خاموش کردن» بود → کلیک (نود، والد کلیک‌پذیر، ضربه‌ی لمسی)
+     *    ب) اگر منو کشیدنی بود (آیکون بالا=خاموش، پایین=ری‌استارت) → ژست «کشیدن آیکون به بالا»
+     * ۴) اگر دیالوگ تأیید آمد → روی دکمه‌ی تأیید کلیک می‌کنیم
+     * ۵) اگر تا ۱۱ ثانیه خاموش نشد → حداقل صفحه قفل می‌شود (حالت جایگزین امن)
      */
     fun tryPowerOffViaMenu(): Boolean {
         powerMenuPending = true
+        lastAttemptAt = 0
+        scanCount = 0
 
+        // مرحله ۱: بیدار کردن صفحه
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (!pm.isInteractive) {
@@ -67,39 +83,146 @@ class LockAccessibilityService : AccessibilityService() {
                     PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP,
                     "SleepMusic:WakeForShutdown"
                 )
-                wakeLock.acquire(6000)
+                wakeLock.acquire(8000)
             }
         } catch (_: Exception) { }
 
-        // کمی صبر برای روشن شدن صفحه، بعد باز کردن منوی خاموشی
+        // مرحله ۲: باز کردن منوی پاور (کمی صبر برای روشن شدن صفحه)
         handler.postDelayed({
             if (powerMenuPending) performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
         }, 1000)
 
-        // منو کمی طول می‌کشد تا باز شود؛ در فواصل مختلف چند بار دنبال دکمه می‌گردیم
-        handler.postDelayed({ if (powerMenuPending) scanAndClick() }, 1700)
-        handler.postDelayed({ if (powerMenuPending) scanAndClick() }, 2300)
-        handler.postDelayed({ if (powerMenuPending) scanAndClick() }, 3000)
-        // برای رام‌هایی که به‌جای کلیک، نگه‌داشتن می‌خواهند
-        handler.postDelayed({ if (powerMenuPending) scanAndClick(longClick = true) }, 4400)
-        handler.postDelayed({ if (powerMenuPending) scanAndClick() }, 5600)
+        // مرحله ۳: جستجوی دوره‌ای — کلیک روی دکمه یا کشیدن آیکون به بالا
+        val scanTimes = longArrayOf(1900, 2700, 3500, 4300, 5100)
+        for (t in scanTimes) {
+            handler.postDelayed({ if (powerMenuPending) tryScan() }, t)
+        }
 
-        // حالت جایگزین: اگر هیچ دکمه‌ای پیدا نشد → حداقل صفحه را قفل کن
+        // مرحله ۴: جستجوی دیالوگ تأیید (بعد از کلیک/کشیدن)
+        val confirmTimes = longArrayOf(2600, 3400, 4400, 5600, 6800)
+        for (t in confirmTimes) {
+            handler.postDelayed({ if (powerMenuPending) scanForConfirm() }, t)
+        }
+
+        // مرحله ۵: حالت جایگزین امن — قفل صفحه
         handler.postDelayed({
             if (powerMenuPending) {
                 powerMenuPending = false
                 performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
             }
-        }, 8000)
+        }, 11000)
 
         return true
     }
 
-    private fun scanAndClick(longClick: Boolean = false) {
+    private fun tryScan() {
+        if (!powerMenuPending) return
+        lastAttemptAt = SystemClock.elapsedRealtime()
+        val attempt = scanCount
+        scanCount++
+        scanAndAct(attempt)
+    }
+
+    /** یک دور جستجو: اول دکمه‌ی خاموشی، اگر نبود (یا نوبت کشیدن بود) ژست «کشیدن به بالا» */
+    private fun scanAndAct(attempt: Int) {
+        if (!powerMenuPending) return
+        val root = findSystemUiRoot()
+
+        if (root != null) {
+            try { root.refresh() } catch (_: Exception) { }
+
+            val node = findNodeByKeywords(root, POWER_OFF_KEYWORDS)
+            if (node != null) {
+                val rect = Rect()
+                node.getBoundsInScreen(rect)
+
+                // منوی دکمه‌ای: کلیک استاندارد (نوبت ۲ و ۴ فقط مخصوص کشیدن است)
+                if (attempt != 2 && attempt != 4) {
+                    val clickable = findClickableSelfOrAncestor(node)
+                    if (clickable != null) {
+                        if (clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return
+                        if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60)) return
+                    }
+                }
+
+                // منوی کشیدنی: برچسب «خاموش کردن» معمولاً بالای اسلایدر است؛ از دستگیره تا آنجا می‌کشیم
+                val startRatio = if (attempt % 2 == 0) 0.56f else 0.50f
+                val duration = if (attempt == 4) 900L else 600L
+                dragToPowerOff(rect, startRatio, duration)
+                return
+            }
+        }
+
+        // نودی پیدا نشد: روی بعضی رام‌ها اسلایدر هیچ متنی ندارد → ژست عمومی از وسط صفحه به بالا
+        if (root != null) {
+            val startRatio = if (attempt % 2 == 0) 0.58f else 0.52f
+            dragToPowerOff(null, startRatio, 700L)
+        } else if (attempt >= 3) {
+            // منو باز نشده یا وسط کار بسته شده؛ دوباره بازش می‌کنیم
+            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+        }
+    }
+
+    /** جستجوی دیالوگ تأیید: فقط دکمه‌ی کلیک‌پذیرِ «خاموش کردن/تأیید» را کلیک می‌کنیم */
+    private fun scanForConfirm() {
         if (!powerMenuPending) return
         val root = findSystemUiRoot() ?: return
         try { root.refresh() } catch (_: Exception) { }
 
+        val node = findNodeByKeywords(root, CONFIRM_KEYWORDS) ?: return
+        val clickable = findClickableSelfOrAncestor(node) ?: return
+        if (clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            powerMenuPending = false
+            return
+        }
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
+        if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60)) {
+            powerMenuPending = false
+        }
+    }
+
+    /**
+     * ژست «کشیدن به بالا» برای منوی کشیدنی HyperOS:
+     * از محل دستگیره (وسط صفحه) به سمت برچسب «خاموش کردن» (بالای صفحه) می‌کشیم.
+     * targetLabel = محل برچسب؛ اگر null باشد به بالای صفحه می‌کشیم.
+     * فقط به سمت بالا می‌کشیم تا هیچ‌وقت باعث «ری‌استارت» (کشیدن به پایین) نشود.
+     */
+    private fun dragToPowerOff(targetLabel: Rect?, startRatio: Float, durationMs: Long): Boolean {
+        return try {
+            val w = resources.displayMetrics.widthPixels
+            val h = resources.displayMetrics.heightPixels
+            if (w <= 0 || h <= 0) return false
+
+            val startX = w * 0.5f
+            val startY = h * startRatio
+            val endX: Float
+            val endY: Float
+            if (targetLabel != null && !targetLabel.isEmpty && targetLabel.centerY() < h * 0.40f) {
+                endX = targetLabel.exactCenterX()
+                endY = targetLabel.exactCenterY()
+            } else {
+                endX = w * 0.5f
+                endY = h * 0.08f
+            }
+
+            val path = Path()
+            path.moveTo(startX, startY)
+            path.lineTo(endX, endY)
+
+            val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
+            val gesture = GestureDescription.Builder().addStroke(stroke).build()
+            dispatchGesture(gesture, null, null)
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** جستجوی سطح‌به‌سطح نود بر اساس متن/contentDescription */
+    private fun findNodeByKeywords(
+        root: AccessibilityNodeInfo,
+        keywords: List<String>
+    ): AccessibilityNodeInfo? {
         val queue = ArrayDeque<AccessibilityNodeInfo>()
         queue.add(root)
         var checked = 0
@@ -108,79 +231,38 @@ class LockAccessibilityService : AccessibilityService() {
             checked++
             val label = ((node.text?.toString() ?: "") + " " +
                 (node.contentDescription?.toString() ?: "")).lowercase()
-            if (POWER_OFF_KEYWORDS.any { label.contains(it) }) {
-                val clicked = if (longClick) {
-                    clickNode(node, longClick = true)
-                } else {
-                    clickNode(node)
-                }
-                if (clicked) {
-                    powerMenuPending = false
-                    return
-                }
+            if (label.isNotEmpty() && keywords.any { label.contains(it) }) {
+                return node
             }
             for (i in 0 until node.childCount) {
-                node.getChild(i)?.let { queue.add(it) }
+                val child = try { node.getChild(i) } catch (_: Exception) { null }
+                if (child != null) queue.add(child)
             }
         }
+        return null
     }
 
-    /**
-     * تلاش برای کلیک روی نود به سه روش پشت سر هم:
-     * ۱) کلیک مستقیم روی خود نود (اگر کلیک‌پذیر باشد)
-     * ۲) بالا رفتن تا ۶ سطح والد تا اولین والدِ کلیک‌پذیر پیدا شود و کلیک شود
-     * ۳) ضربه‌ی لمسی (dispatchGesture) روی مرکز نود — روی MIUI خیلی وقت‌ها تنها همین کار می‌کند
-     */
-    private fun clickNode(node: AccessibilityNodeInfo, longClick: Boolean = false): Boolean {
-        // روش ۱ و ۲: کلیک استاندارد
+    /** از خود نود تا ۷ سطح بالا: اولین والد کلیک‌پذیر */
+    private fun findClickableSelfOrAncestor(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
         var current: AccessibilityNodeInfo? = node
         var depth = 0
         while (current != null && depth < 7) {
-            val clickable = current.isClickable
-            if (clickable) {
-                val action = if (longClick) {
-                    AccessibilityNodeInfo.ACTION_LONG_CLICK
-                } else {
-                    AccessibilityNodeInfo.ACTION_CLICK
-                }
-                if (current.performAction(action)) return true
-            }
+            if (current.isClickable) return current
             current = try { current.parent } catch (_: Exception) { null }
             depth++
         }
-
-        // روش ۳: ضربه‌ی لمسی روی مختصات دکمه
-        return tapNodeCenter(node, longClick)
+        return null
     }
 
-    private fun tapNodeCenter(node: AccessibilityNodeInfo, longClick: Boolean): Boolean {
+    /** ضربه‌ی لمسی روی یک مختصات دقیق */
+    private fun tapAt(x: Float, y: Float, durationMs: Long): Boolean {
         return try {
-            val rect = Rect()
-            node.getBoundsInScreen(rect)
-            if (rect.isEmpty || rect.width() <= 0 || rect.height() <= 0) return false
-            val cx = rect.exactCenterX()
-            val cy = rect.exactCenterY()
-            val gesture = if (longClick) {
-                GestureDescription.Builder()
-                    .addStroke(
-                        GestureDescription.StrokeDescription(
-                            android.graphics.Path().apply {
-                                moveTo(cx, cy); lineTo(cx, cy)
-                            }, 0L, 700L
-                        )
-                    )
-                    .build()
-            } else {
-                GestureDescription.Builder()
-                    .addStroke(
-                        GestureDescription.StrokeDescription(
-                            android.graphics.Path().apply {
-                                moveTo(cx, cy); lineTo(cx, cy)
-                            }, 0L, 60L
-                        )
-                    )
-                    .build()
-            }
+            val path = Path()
+            path.moveTo(x, y)
+            path.lineTo(x, y)
+            val gesture = GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(path, 0L, durationMs))
+                .build()
             dispatchGesture(gesture, null, null)
         } catch (_: Exception) {
             false
