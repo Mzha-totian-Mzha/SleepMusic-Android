@@ -15,14 +15,17 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import java.io.IOException
 
 class MusicService : Service() {
 
     private var player: MediaPlayer? = null
     private val tickHandler = Handler(Looper.getMainLooper())
+    private var retryCount = 0
 
     // فوکوس صوتی: بعضی رام‌ها (مثل MIUI) بدون آن، صدا را درست مسیریابی نمی‌کنند
     private val focusListener = AudioManager.OnAudioFocusChangeListener { }
@@ -65,30 +68,49 @@ class MusicService : Service() {
         }
         // حالت پیش‌نمایش: فقط پخش می‌کند؛ در پایان آهنگ خاموشی انجام نمی‌شود
         previewMode = intent.getBooleanExtra(EXTRA_PREVIEW, false)
+        retryCount = 0
 
         createChannelAndStartForeground()
+        launchPlayer(uriString)
+        return START_NOT_STICKY
+    }
 
-        player?.release()
-        player = MediaPlayer().apply {
-            setAudioAttributes(
+    /**
+     * ساخت پلیر و شروع پخش.
+     * نکته‌ی مهم: به‌جای پاس‌دادن مستقیم URI به MediaPlayer (که روی بعضی رام‌ها
+     * مخصوصاً با مسیرهای فارسی/دارای فضاخالی خطای -38 می‌دهد)، فایل را با
+     * FileDescriptor از ContentResolver باز می‌کنیم؛ این روش همه‌جا پایدار است.
+     */
+    private fun launchPlayer(uriString: String) {
+        player?.run {
+            try { stop() } catch (_: Exception) { }
+            release()
+        }
+        player = null
+
+        var fd: ParcelFileDescriptor? = null
+        var mp: MediaPlayer? = null
+        try {
+            mp = MediaPlayer()
+            mp.setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                     .setUsage(AudioAttributes.USAGE_MEDIA)
                     .build()
             )
-            setVolume(1f, 1f)
-            setWakeMode(this@MusicService, PowerManager.PARTIAL_WAKE_LOCK)
-            setOnPreparedListener { mp ->
-                durationSec = mp.duration / 1000
+            mp.setWakeMode(this, PowerManager.PARTIAL_WAKE_LOCK)
+            mp.setOnPreparedListener { prepared ->
+                durationSec = prepared.duration / 1000
                 positionSec = 0
-                audioSessionId = mp.audioSessionId
+                audioSessionId = prepared.audioSessionId
                 MusicService.isPreview = previewMode
                 MusicService.isPlaying = true
-                tickHandler.post(ticker)
                 requestAudioFocus()
-                mp.start()
+                prepared.setVolume(1f, 1f)
+                prepared.start()
+                tickHandler.post(ticker)
             }
-            setOnCompletionListener {
+            mp.setOnCompletionListener {
                 // پایان آهنگ: در حالت عادی خاموشی (یا قفل صفحه)؛ در پیش‌نمایش فقط توقف
                 if (!previewMode) {
                     val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
@@ -96,29 +118,41 @@ class MusicService : Service() {
                 }
                 stopEverything()
             }
-            setOnErrorListener { _, what, extra ->
-                Toast.makeText(
-                    this@MusicService,
-                    "پخش با خطا متوقف شد (کد " + what + "/" + extra + ")؛ آهنگ را دوباره انتخاب کن",
-                    Toast.LENGTH_LONG
-                ).show()
-                stopEverything()
+            mp.setOnErrorListener { _, what, extra ->
+                // یک بار خودکار تلاش مجدد؛ اگر باز هم خطا داد پیام نشان می‌دهیم
+                if (retryCount < 1) {
+                    retryCount++
+                    MusicService.isPlaying = false
+                    tickHandler.removeCallbacks(ticker)
+                    tickHandler.postDelayed({ launchPlayer(uriString) }, 400)
+                } else {
+                    Toast.makeText(
+                        this@MusicService,
+                        "پخش با خطا متوقف شد (کد " + what + "/" + extra + ")؛ لطفاً دوباره آهنگ را انتخاب کن",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    stopEverything()
+                }
                 true
             }
-            try {
-                setDataSource(this@MusicService, Uri.parse(uriString))
-                // آماده‌سازی غیرمسدودکننده؛ start در OnPreparedListener انجام می‌شود
-                prepareAsync()
-            } catch (_: Exception) {
-                Toast.makeText(
-                    this@MusicService,
-                    "دسترسی به فایل موسیقی ممکن نشد؛ لطفاً دوباره آهنگ را انتخاب کن",
-                    Toast.LENGTH_LONG
-                ).show()
-                stopEverything()
-            }
+            fd = contentResolver.openFileDescriptor(Uri.parse(uriString), "r")
+                ?: throw IOException("باز کردن فایل ممکن نشد")
+            mp.setDataSource(fd.fileDescriptor)
+            // آماده‌سازی غیرمسدودکننده؛ start در OnPreparedListener انجام می‌شود
+            mp.prepareAsync()
+            player = mp
+        } catch (_: Exception) {
+            try { mp?.release() } catch (_: Exception) { }
+            Toast.makeText(
+                this,
+                "دسترسی به فایل موسیقی ممکن نشد؛ لطفاً دوباره آهنگ را انتخاب کن",
+                Toast.LENGTH_LONG
+            ).show()
+            stopEverything()
+        } finally {
+            // MediaPlayer به‌صورت داخلی کپی fd را نگه می‌دارد؛ بستن این یکی امن است
+            try { fd?.close() } catch (_: Exception) { }
         }
-        return START_NOT_STICKY
     }
 
     private fun createChannelAndStartForeground() {
