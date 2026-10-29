@@ -59,6 +59,16 @@ class EqualizerView @JvmOverloads constructor(
     private var frame = 0L
     private var shaderWidth = -1
 
+    // پالت فعال؛ به‌صورت پیش‌فرض شفق قطبی و با هر تم عوض می‌شود
+    private var palette: IntArray = AURORA
+
+    /** پالت رنگی موج را با تم فعلی هماهنگ می‌کند */
+    fun setPalette(colors: IntArray) {
+        palette = colors
+        shaderWidth = -1
+        invalidate()
+    }
+
     init {
         glowPaint.maskFilter = BlurMaskFilter(10f, BlurMaskFilter.Blur.NORMAL)
     }
@@ -168,10 +178,10 @@ class EqualizerView @JvmOverloads constructor(
         if (w <= 0f || h <= 0f) return
         val mid = h / 2f
 
-        // گرادیان شفق قطبی در طول موج: بنفش کمرنگ → فیروزه‌ای → سبز زمردی (مثل عکس مرجع)
+        // گرادیان در طول موج با پالت تم فعلی
         if (shaderWidth != width) {
             shaderWidth = width
-            val shader = LinearGradient(0f, 0f, w, 0f, AURORA, null, Shader.TileMode.CLAMP)
+            val shader = LinearGradient(0f, 0f, w, 0f, palette, null, Shader.TileMode.CLAMP)
             bodyPaint.shader = shader
             glowPaint.shader = shader
         }

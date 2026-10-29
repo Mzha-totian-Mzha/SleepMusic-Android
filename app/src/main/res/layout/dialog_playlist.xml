@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@drawable/bg_dialog_lavender"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="🎵  پلی‌لیست خواب"
+            android:textColor="#15803D"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:gravity="center"
+            android:text="آهنگ‌ها به ترتیب شماره پخش می‌شوند؛ چیپ «زمان خاموش شدن» می‌شود مجموع همه"
+            android:textColor="#8B7FA8"
+            android:textSize="9.5sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:id="@+id/playlistList"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical" />
+
+        <TextView
+            android:id="@+id/btnAddTrack"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:background="@drawable/bg_dashed_add"
+            android:gravity="center"
+            android:padding="11dp"
+            android:text="＋ افزودن آهنگ از حافظه"
+            android:textColor="#7C3AED"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tvPlaylistTotal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="9dp"
+            android:background="@drawable/bg_total_box"
+            android:gravity="center"
+            android:padding="10dp"
+            android:text="پلی‌لیست خالی است"
+            android:textColor="#5B21B6"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/btnClosePlaylist"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_close_pill"
+            android:paddingStart="26dp"
+            android:paddingTop="7dp"
+            android:paddingEnd="26dp"
+            android:paddingBottom="7dp"
+            android:text="بستن"
+            android:textColor="#15803D"
+            android:textSize="13sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+</ScrollView>
