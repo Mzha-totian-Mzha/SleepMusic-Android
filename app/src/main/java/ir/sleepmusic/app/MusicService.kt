@@ -61,7 +61,7 @@ class MusicService : Service() {
                 durationSec = mp.duration / 1000
                 positionSec = 0
                 audioSessionId = mp.audioSessionId
-                this@MusicService.isPlaying = true
+                MusicService.isPlaying = true
                 tickHandler.post(ticker)
             }
             setOnCompletionListener {

@@ -89,10 +89,10 @@ class EqualizerView @JvmOverloads constructor(
             val v = Visualizer(sessionId)
             // نرخ نمونه‌برداری در listener تنظیم می‌شود: getMaxCaptureRate() / 2 → تعقیب زنده و نرمِ موج صدا
             v.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
-                override fun onWaveFormCapture(v: Visualizer?, bytes: ByteArray?, samplingRate: Int) {
+                override fun onWaveFormDataCapture(v: Visualizer?, bytes: ByteArray?, samplingRate: Int) {
                     waveform = bytes
                 }
-                override fun onFftCapture(v: Visualizer?, bytes: ByteArray?, samplingRate: Int) { }
+                override fun onFftDataCapture(v: Visualizer?, bytes: ByteArray?, samplingRate: Int) { }
             }, Visualizer.getMaxCaptureRate() / 2, true, false)
             v.enabled = true
             visualizer = v
