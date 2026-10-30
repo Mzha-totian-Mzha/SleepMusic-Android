@@ -4,6 +4,7 @@
     android:layout_height="wrap_content">
 
     <LinearLayout
+        android:id="@+id/dlgSettingsRoot"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_dialog_lavender"
@@ -11,6 +12,7 @@
         android:padding="16dp">
 
         <TextView
+            android:id="@+id/dlgSettingsTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
@@ -20,6 +22,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/dlgSettingsSub"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
@@ -72,6 +75,7 @@
                         android:textStyle="bold" />
 
                     <TextView
+                        android:id="@+id/tvPillTheme"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="6dp"
@@ -80,7 +84,7 @@
                         android:paddingTop="2dp"
                         android:paddingEnd="8dp"
                         android:paddingBottom="2dp"
-                        android:text="۶ تم"
+                        android:text="۹ تم"
                         android:textColor="#6D28D9"
                         android:textSize="8.5sp"
                         android:textStyle="bold" />
@@ -90,7 +94,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:text="بنفش شبانه، سبز آرامش، شب تیره، غروب گرم، سبز و یاسی، ارکیده"
+                    android:text="بنفش شبانه، سبز آرامش، شب تیره، غروب گرم، سبز و یاسی، ارکیده، زرشکی، ارغوانی، زرد"
                     android:textColor="#9A8FB5"
                     android:textSize="8.5sp"
                     android:textStyle="bold" />
@@ -146,19 +150,6 @@
                         android:textSize="12.5sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_pill"
-                        android:paddingStart="8dp"
-                        android:paddingTop="2dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="2dp"
-                        android:text="جدید"
-                        android:textColor="#EA580C"
-                        android:textSize="8.5sp"
-                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
@@ -221,26 +212,13 @@
                         android:textSize="12.5sp"
                         android:textStyle="bold" />
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="6dp"
-                        android:background="@drawable/bg_pill"
-                        android:paddingStart="8dp"
-                        android:paddingTop="2dp"
-                        android:paddingEnd="8dp"
-                        android:paddingBottom="2dp"
-                        android:text="همیشه"
-                        android:textColor="#15803D"
-                        android:textSize="8.5sp"
-                        android:textStyle="bold" />
                 </LinearLayout>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="1dp"
-                    android:text="همان آهنگ‌گزینی همیشگی"
+                    android:text="همان آهنگ همیشگی"
                     android:textColor="#9A8FB5"
                     android:textSize="8.5sp"
                     android:textStyle="bold" />
@@ -450,14 +428,6 @@
                         android:textStyle="bold" />
                 </LinearLayout>
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="همان دسترسی‌ای که خاموشی واقعی با آن کار می‌کند — وضعیتش همیشه این‌جاست"
-                    android:textColor="#9A8FB5"
-                    android:textSize="8.5sp"
-                    android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
 

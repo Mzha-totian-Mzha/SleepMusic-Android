@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- دسته نوار پیشرفت — ۲۰ پیکسل، سفید، سایه نرم -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <size android:width="20dp" android:height="20dp" />
+            <solid android:color="#FFFFFF" />
+            <stroke android:width="1dp" android:color="#14000000" />
+        </shape>
+    </item>
+    <item android:gravity="center">
+        <shape android:shape="oval">
+            <size android:width="6dp" android:height="6dp" />
+            <solid android:color="#22000000" />
+        </shape>
+    </item>
+</layer-list>

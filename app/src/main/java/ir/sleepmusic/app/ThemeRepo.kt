@@ -3,8 +3,9 @@ package ir.sleepmusic.app
 import android.graphics.Color
 
 /**
- * شش تم رنگی برنامه — دقیقاً همان رنگ‌های تأییدشده در پیش‌نمایش:
- * ۱ بنفش شبانه، ۲ سبز آرامش، ۳ شب تیره، ۴ غروب گرم، ۵ سبز و یاسی (پیش‌فرض)، ۶ ارکیده
+ * نه تم رنگی برنامه — دقیقاً همان رنگ‌های تأییدشده در پیش‌نمایش:
+ * ۱ بنفش شبانه، ۲ سبز آرامش، ۳ شب تیره، ۴ غروب گرم، ۵ سبز و یاسی (پیش‌فرض)، ۶ ارکیده،
+ * ۷ زرشکی شب، ۸ ارغوانی، ۹ زرد گرم
  * تم «ارکیده» از روی عکس خود کاربر (یاسی روشن + دایره‌های بنفش + دکمه‌های سبز) ساخته شده است.
  */
 data class AppTheme(
@@ -104,8 +105,8 @@ object ThemeRepo {
             bodyBg = c("#241F33"),
             cardBg = c("#2F2942"),
             textPrimary = c("#F1EDFA"),
-            textMuted = c("#A79FC4"),
-            textFaint = c("#6E6690"),
+            textMuted = c("#B7AED8"),
+            textFaint = c("#948ABD"),
             btnColors = intArrayOf(c("#F59E0B"), c("#F43F5E")),
             eqColors = intArrayOf(c("#FBBF24"), c("#FB7185"), c("#C084FC"), c("#34D399")),
             progressColor = c("#FBBF24"),
@@ -119,7 +120,7 @@ object ThemeRepo {
             pillIdleText = c("#FBBF24"),
             rowIconBg = c("#3A3352"),
             rowIconColor = c("#FBBF24"),
-            footer = c("#6E6690")
+            footer = c("#948ABD")
         ),
         AppTheme(
             id = "sunset",
@@ -201,6 +202,88 @@ object ThemeRepo {
             rowIconBg = c("#F3EEFE"),
             rowIconColor = c("#7C3AED"),
             footer = c("#B4A9D6")
+        )
+,
+        AppTheme(
+            id = "burgundy",
+            num = "۷",
+            label = "زرشکی شب",
+            emoji = "🌹",
+            statusBar = c("#BE123C"),
+            headerColors = intArrayOf(c("#FB9FB0"), c("#E11D48"), c("#881337")),
+            bodyBg = c("#FBF3F5"),
+            cardBg = Color.WHITE,
+            textPrimary = c("#3D1220"),
+            textMuted = c("#A8687A"),
+            textFaint = c("#D8AEBA"),
+            btnColors = intArrayOf(c("#BE123C"), c("#E11D48"), c("#FB7185")),
+            eqColors = intArrayOf(c("#BE123C"), c("#F43F5E"), c("#FB923C"), c("#FBBF24")),
+            progressColor = c("#BE123C"),
+            chipABg = c("#FCE7EF"),
+            chipAIcon = c("#BE123C"),
+            chipBBg = c("#E7F9F1"),
+            chipBIcon = c("#059669"),
+            pillPlayBg = c("#FDE8EE"),
+            pillPlayText = c("#BE123C"),
+            pillIdleBg = c("#F5E0E6"),
+            pillIdleText = c("#9F1239"),
+            rowIconBg = c("#FCE7EF"),
+            rowIconColor = c("#BE123C"),
+            footer = c("#D8AEBA")
+        ),
+        AppTheme(
+            id = "magenta",
+            num = "۸",
+            label = "ارغوانی",
+            emoji = "🌺",
+            statusBar = c("#C026D3"),
+            headerColors = intArrayOf(c("#F0ABFC"), c("#D946EF"), c("#A21CAF")),
+            bodyBg = c("#FBF2FC"),
+            cardBg = Color.WHITE,
+            textPrimary = c("#43143E"),
+            textMuted = c("#AC6BA5"),
+            textFaint = c("#DBB3D6"),
+            btnColors = intArrayOf(c("#C026D3"), c("#D946EF"), c("#F472B6")),
+            eqColors = intArrayOf(c("#C026D3"), c("#E879F9"), c("#F472B6"), c("#FBBF24")),
+            progressColor = c("#C026D3"),
+            chipABg = c("#FAE8FF"),
+            chipAIcon = c("#C026D3"),
+            chipBBg = c("#E7F9F1"),
+            chipBIcon = c("#059669"),
+            pillPlayBg = c("#FAE8FF"),
+            pillPlayText = c("#A21CAF"),
+            pillIdleBg = c("#F4DFF5"),
+            pillIdleText = c("#86198F"),
+            rowIconBg = c("#FAE8FF"),
+            rowIconColor = c("#A21CAF"),
+            footer = c("#DBB3D6")
+        ),
+        AppTheme(
+            id = "amber",
+            num = "۹",
+            label = "زرد گرم",
+            emoji = "🌟",
+            statusBar = c("#D97706"),
+            headerColors = intArrayOf(c("#FDE68A"), c("#F59E0B"), c("#C2660A")),
+            bodyBg = c("#FFFBEF"),
+            cardBg = Color.WHITE,
+            textPrimary = c("#4A3210"),
+            textMuted = c("#A5854F"),
+            textFaint = c("#DFC894"),
+            btnColors = intArrayOf(c("#D97706"), c("#F59E0B"), c("#FBBF24")),
+            eqColors = intArrayOf(c("#D97706"), c("#FBBF24"), c("#84CC16"), c("#10B981")),
+            progressColor = c("#D97706"),
+            chipABg = c("#FEF3C7"),
+            chipAIcon = c("#D97706"),
+            chipBBg = c("#E7F9F1"),
+            chipBIcon = c("#059669"),
+            pillPlayBg = c("#FEF3C7"),
+            pillPlayText = c("#92400E"),
+            pillIdleBg = c("#F7EDD6"),
+            pillIdleText = c("#92400E"),
+            rowIconBg = c("#FEF3C7"),
+            rowIconColor = c("#B45309"),
+            footer = c("#DFC894")
         )
     )
 

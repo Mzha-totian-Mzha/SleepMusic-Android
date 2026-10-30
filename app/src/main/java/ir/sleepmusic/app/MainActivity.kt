@@ -71,23 +71,40 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvChipBLabel: TextView
     private lateinit var tvChipBValue: TextView
 
-    // دکمه بزرگ و ردیف‌ها
-    private lateinit var btnBig: LinearLayout
-    private lateinit var tvBigMain: TextView
-    private lateinit var tvBigSub: TextView
-    private lateinit var rowPick: LinearLayout
-    private lateinit var rowPickIcon: TextView
-    private lateinit var rowPickLabel: TextView
-    private lateinit var rowPlaylist: LinearLayout
-    private lateinit var rowPlaylistIcon: TextView
-    private lateinit var tvPlaylistTitle: TextView
-    private lateinit var tvPlaylistSub: TextView
+    // دکمه‌های سه‌حالته + توقف کامل
+    private lateinit var btnPlay: LinearLayout
+    private lateinit var btnPause: LinearLayout
+    private lateinit var btnResume: LinearLayout
+    private lateinit var tvBtnPlay: TextView
+    private lateinit var tvBtnPause: TextView
+    private lateinit var tvBtnResume: TextView
+    private lateinit var btnStopAll: LinearLayout
     private lateinit var cardStats: LinearLayout
     private lateinit var statsIcon: TextView
     private lateinit var tvStatsMain: TextView
-    private lateinit var tvStatsSub: TextView
     private lateinit var statsDots: LinearLayout
     private lateinit var tvFooter: TextView
+
+    // جمله‌های انگیزشی چرخشی پایین صفحه — به جای متن ثابت (درخواست کاربر)
+    private val motivation = listOf(
+        "شب بخیر، خواب خوش 🌙",
+        "امشب هم آرام بخواب 😴",
+        "نفسی عمیق بکش و رها شو 🌌",
+        "موسیقی تا آخر؛ بعدش گوشی خودش می‌خوابد 🌙",
+        "خواب‌موزیک همین‌جا کنار توست 💜"
+    )
+    private var footerIdx = 0
+    private val footerHandler = Handler(Looper.getMainLooper())
+    private val footerTicker = object : Runnable {
+        override fun run() {
+            footerIdx = (footerIdx + 1) % motivation.size
+            tvFooter.animate().alpha(0f).setDuration(300).withEndAction {
+                tvFooter.text = motivation[footerIdx]
+                tvFooter.animate().alpha(1f).setDuration(300).start()
+            }.start()
+            footerHandler.postDelayed(this, 4000)
+        }
+    }
 
     private var lastPlaying = false
     private var seekDragging = false
@@ -174,7 +191,6 @@ class MainActivity : AppCompatActivity() {
 
         val savedUri = prefs.getString("music_uri", null)
         if (savedUri != null) updateMusicInfo(Uri.parse(savedUri))
-        refreshPlaylistRow()
         refreshStats()
 
         if (Build.VERSION.SDK_INT >= 33) {
@@ -187,17 +203,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         findViewById<View>(R.id.btnSettings).setOnClickListener { showSettingsDialog() }
-        rowPick.setOnClickListener { pickAudio.launch(arrayOf("audio/*")) }
-        rowPlaylist.setOnClickListener { showPlaylistDialog() }
 
-        btnBig.setOnClickListener {
-            if (MusicService.isPlaying) {
-                // توقف دستی = زنجیره‌ی امشب کامل نشده
-                startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_STOP))
-                Toast.makeText(this, "پخش متوقف شد", Toast.LENGTH_SHORT).show()
-            } else {
-                startPlayback()
-            }
+        btnPlay.setOnClickListener { startPlayback() }
+        btnPause.setOnClickListener {
+            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_PAUSE))
+            Toast.makeText(this, "در مکث؛ چیپ «زمان خاموش شدن» فریز شد", Toast.LENGTH_SHORT).show()
+        }
+        btnResume.setOnClickListener {
+            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_RESUME))
+            Toast.makeText(this, "ادامه از همان ثانیه؛ شمارش خاموشی هم ادامه پیدا کرد", Toast.LENGTH_SHORT).show()
+        }
+        btnStopAll.setOnClickListener {
+            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_STOP))
+            Toast.makeText(this, "توقف کامل شد؛ خاموشی امشب لغو شد", Toast.LENGTH_SHORT).show()
         }
 
         seekBar.max = 100
@@ -221,11 +239,14 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         uiHandler.post(ticker)
         refreshStats()
+        footerHandler.removeCallbacks(footerTicker)
+        footerHandler.postDelayed(footerTicker, 4000)
     }
 
     override fun onPause() {
         super.onPause()
         uiHandler.removeCallbacks(ticker)
+        footerHandler.removeCallbacks(footerTicker)
     }
 
     override fun onDestroy() {
@@ -256,23 +277,22 @@ class MainActivity : AppCompatActivity() {
         chipBIcon = findViewById(R.id.chipBIcon)
         tvChipBLabel = findViewById(R.id.tvChipBLabel)
         tvChipBValue = findViewById(R.id.tvChipBValue)
-        btnBig = findViewById(R.id.btnBig)
-        tvBigMain = findViewById(R.id.tvBigMain)
-        tvBigSub = findViewById(R.id.tvBigSub)
-        rowPick = findViewById(R.id.rowPick)
-        rowPickIcon = findViewById(R.id.rowPickIcon)
-        rowPickLabel = findViewById(R.id.rowPickLabel)
-        rowPlaylist = findViewById(R.id.rowPlaylist)
-        rowPlaylistIcon = findViewById(R.id.rowPlaylistIcon)
-        tvPlaylistTitle = findViewById(R.id.tvPlaylistTitle)
-        tvPlaylistSub = findViewById(R.id.tvPlaylistSub)
+        btnPlay = findViewById(R.id.btnPlay)
+        btnPause = findViewById(R.id.btnPause)
+        btnResume = findViewById(R.id.btnResume)
+        tvBtnPlay = findViewById(R.id.tvBtnPlay)
+        tvBtnPause = findViewById(R.id.tvBtnPause)
+        tvBtnResume = findViewById(R.id.tvBtnResume)
+        btnStopAll = findViewById(R.id.btnStopAll)
         cardStats = findViewById(R.id.cardStats)
         statsIcon = findViewById(R.id.statsIcon)
         tvStatsMain = findViewById(R.id.tvStatsMain)
-        tvStatsSub = findViewById(R.id.tvStatsSub)
         statsDots = findViewById(R.id.statsDots)
         tvFooter = findViewById(R.id.tvFooter)
         equalizerView.setPlaying(false)
+        pressScale(btnPlay); pressScale(btnPause); pressScale(btnResume)
+        pressScale(btnStopAll); pressScale(cardStats)
+        findViewById<View>(R.id.btnSettings).let { pressScale(it) }
     }
 
     /** دکمه بزرگ: پخش (تک‌آهنگ یا پلی‌لیست) + خاموشی بعد از پایان */
@@ -300,9 +320,10 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "پخش شروع شد؛ درست بعد از پایان موسیقی گوشی خاموش می‌شود", Toast.LENGTH_LONG).show()
     }
 
-    /** به‌روزرسانی زنده: دکمه، چیپ‌ها، نوار پیشرفت و رقص نور */
+    /** به‌روزرسانی زنده: سه دکمه، چیپ‌ها، نوار پیشرفت و رقص نور */
     private fun updatePlaybackUi() {
         val playing = MusicService.isPlaying
+        val paused = MusicService.isPaused
         if (playing != lastPlaying) {
             lastPlaying = playing
             equalizerView.setPlaying(playing, MusicService.audioSessionId)
@@ -317,8 +338,6 @@ class MainActivity : AppCompatActivity() {
             }
             pill(tvPlayPill, theme.pillPlayBg, theme.pillPlayText)
             tvPlayPill.text = "در حال پخش"
-            tvBigMain.text = "■   توقف پخش"
-            tvBigSub.text = "لغو خاموشی خودکار"
             val dur = MusicService.durationSec
             if (dur > 0) {
                 seekBar.max = dur
@@ -327,23 +346,49 @@ class MainActivity : AppCompatActivity() {
             }
             tvTimeElapsed.text = ThemeRepo.formatSecs(MusicService.positionSec)
             tvChipAValue.text = faDigits(ThemeRepo.formatSecs(MusicService.remainingSec)) + " دیگر"
+            styleTriButtons(playActive = false, pauseActive = true, resumeActive = false)
+            tvBtnResume.text = "▶ ادامه از " + faDigits(ThemeRepo.formatSecs(MusicService.positionSec))
+            btnStopAll.visibility = View.VISIBLE
+        } else if (paused) {
+            tvPlayerStatus.text = "در مکث — خاموشی هم معطل مانده"
+            pill(tvPlayPill, theme.pillIdleBg, theme.pillIdleText)
+            tvPlayPill.text = "مکث"
+            // نوار پیشرفت و چیپ زمان همین‌جا فریز می‌مانند؛ دست نمی‌زنیم
+            tvChipAValue.text = faDigits(ThemeRepo.formatSecs(MusicService.remainingSec)) + " دیگر"
+            styleTriButtons(playActive = false, pauseActive = false, resumeActive = true)
+            tvBtnResume.text = "▶ ادامه از " + faDigits(ThemeRepo.formatSecs(MusicService.positionSec))
+            btnStopAll.visibility = View.VISIBLE
         } else {
             tvPlayerStatus.text = "آماده برای پخش"
             pill(tvPlayPill, theme.pillIdleBg, theme.pillIdleText)
             tvPlayPill.text = "آماده"
-            tvBigMain.text = "▶   پخش"
-            tvBigSub.text = faDigits(ThemeRepo.formatSecs(idleTotalSec())) + " تا خاموش شدن گوشی"
             if (!seekDragging) {
                 seekBar.progress = 0
                 tvTimeElapsed.text = "00:00"
             }
             tvChipAValue.text = faDigits(ThemeRepo.formatSecs(idleTotalSec())) + " دیگر"
+            styleTriButtons(playActive = true, pauseActive = false, resumeActive = false)
+            tvBtnResume.text = "▶ ادامه"
+            btnStopAll.visibility = View.GONE
         }
         tvChipBValue.text = if (playlistNow.size > 1) {
             "پلی‌لیست " + faDigits("" + playlistNow.size) + " آهنگی"
         } else {
             "بعد از پایان موسیقی"
         }
+    }
+
+    /** حالت بصری سه دکمه: فعال با تم کامل، غیرفعال محو */
+    private fun styleTriButtons(playActive: Boolean, pauseActive: Boolean, resumeActive: Boolean) {
+        fun st(v: LinearLayout, active: Boolean) {
+            v.background = gradient(theme.btnColors, dp(18f))
+            v.alpha = if (active) 1f else 0.38f
+            v.isClickable = active
+            v.isEnabled = active
+        }
+        st(btnPlay, playActive)
+        st(btnPause, pauseActive)
+        st(btnResume, resumeActive)
     }
 
     private fun idleTotalSec(): Int {
@@ -412,6 +457,14 @@ class MainActivity : AppCompatActivity() {
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
 
+        // تم روی همه‌ی پنجره‌ها — تنظیمات هم با پالت تم فعلی رندر می‌شود
+        dialog.findViewById<LinearLayout>(R.id.dlgSettingsRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<TextView>(R.id.dlgSettingsTitle)!!.setTextColor(theme.progressColor)
+        dialog.findViewById<TextView>(R.id.dlgSettingsSub)!!.setTextColor(theme.textMuted)
+        dialog.findViewById<TextView>(R.id.btnCloseSettings)!!.setTextColor(theme.progressColor)
+        val tvPillTheme = dialog.findViewById<TextView>(R.id.tvPillTheme)
+        pill(tvPillTheme, theme.rowIconBg, theme.rowIconColor)
+        tvPillTheme.text = "۹ تم"
         val tvPillAlert = dialog.findViewById<TextView>(R.id.tvPillAlert)
         val tvPillStats = dialog.findViewById<TextView>(R.id.tvPillStats)
         val tvPillAccess = dialog.findViewById<TextView>(R.id.tvPillAccess)
@@ -474,6 +527,10 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.92f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        dialog.findViewById<LinearLayout>(R.id.dlgThemeRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<TextView>(R.id.dlgThemeTitle)!!.setTextColor(theme.progressColor)
+        dialog.findViewById<TextView>(R.id.dlgThemeSub)!!.setTextColor(theme.textMuted)
+        dialog.findViewById<TextView>(R.id.btnCloseTheme)!!.setTextColor(theme.progressColor)
         val container = dialog.findViewById<LinearLayout>(R.id.themeList)
 
         fun buildRows() {
@@ -562,9 +619,15 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.92f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        dialog.findViewById<LinearLayout>(R.id.dlgPlaylistRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<TextView>(R.id.dlgPlaylistTitle)!!.setTextColor(theme.progressColor)
+        dialog.findViewById<TextView>(R.id.dlgPlaylistSub)!!.setTextColor(theme.textMuted)
+        dialog.findViewById<TextView>(R.id.btnClosePlaylist)!!.setTextColor(theme.progressColor)
         val container = dialog.findViewById<LinearLayout>(R.id.playlistList)
         val tvTotal = dialog.findViewById<TextView>(R.id.tvPlaylistTotal)
         val btnAdd = dialog.findViewById<TextView>(R.id.btnAddTrack)
+        tvTotal.setTextColor(theme.progressColor)
+        btnAdd.setTextColor(theme.progressColor)
 
         fun refreshTotal(list: List<Track>) {
             var sum = 0
@@ -574,7 +637,6 @@ class MainActivity : AppCompatActivity() {
             } else {
                 tvTotal.text = "مجموع پخش: " + faDigits(ThemeRepo.formatSecs(sum)) + " ← بعد از آخرین آهنگ، گوشی خاموش می‌شود"
             }
-            refreshPlaylistRow()
         }
 
         fun buildRows() {
@@ -699,7 +761,6 @@ class MainActivity : AppCompatActivity() {
             }
             prefs.edit().putString("playlist_json", arr.toString()).apply()
         } catch (_: Exception) { }
-        refreshPlaylistRow()
     }
 
     /** مدت آهنگ‌های تازه‌اضافه را در پس‌زمینه می‌خواند و ذخیره می‌کند */
@@ -726,18 +787,6 @@ class MainActivity : AppCompatActivity() {
         }.start()
     }
 
-    private fun refreshPlaylistRow() {
-        if (!this::tvPlaylistSub.isInitialized) return
-        val list = loadPlaylist()
-        if (list.isEmpty()) {
-            tvPlaylistSub.text = "چند آهنگ پشت‌سرهم تا خاموشی"
-        } else {
-            var sum = 0
-            for (tr in list) sum += tr.durSec
-            tvPlaylistSub.text = faDigits("" + list.size) + " آهنگ • " + faDigits(ThemeRepo.formatSecs(sum)) + " تا خاموشی"
-        }
-    }
-
     /* ================= هشدار ۱۰ ثانیه‌ای ================= */
 
     private fun showAlert(remainingMs: Int) {
@@ -750,6 +799,11 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.86f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
+        dialog.findViewById<LinearLayout>(R.id.dlgAlertRoot)!!.background = roundRect(theme.cardBg, dp(22f))
+        dialog.findViewById<TextView>(R.id.dlgAlertTitle)!!.setTextColor(theme.textPrimary)
+        dialog.findViewById<TextView>(R.id.dlgAlertSub)!!.setTextColor(theme.textMuted)
+        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.background = gradient(theme.btnColors, dp(14f))
+        dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setTextColor(theme.textMuted)
         val bar = dialog.findViewById<View>(R.id.alertBar)
         alertBar = bar
         bar?.scaleX = 1f
@@ -793,9 +847,7 @@ class MainActivity : AppCompatActivity() {
         if (!this::cardStats.isInitialized) return
         cardStats.visibility = if (prefs.getBoolean("stats_enabled", true)) View.VISIBLE else View.GONE
         val streak = prefs.getInt("streak_nights", 0)
-        val best = prefs.getInt("best_record", 0)
         tvStatsMain.text = faDigits("" + streak) + " شب پشت‌سرهم با خواب‌موزیک خوابیدی 🌙"
-        tvStatsSub.text = "بهترین رکورد: " + faDigits("" + best) + " شب — فقط داخل خود گوشی ذخیره می‌شود"
         buildStatsDots(streak)
     }
 
@@ -894,23 +946,12 @@ class MainActivity : AppCompatActivity() {
         tvChipBLabel.setTextColor(t.textFaint)
         tvChipBValue.setTextColor(t.textPrimary)
 
-        btnBig.background = gradient(t.btnColors, dp(24f))
-        btnBig.elevation = dp(6f)
-        tvBigMain.setTextColor(Color.WHITE)
-        tvBigSub.setTextColor(Color.parseColor("#EAFBF3"))
-
-        rowPick.background = roundRect(t.cardBg, dp(20f))
-        rowPickIcon.background = roundRect(t.rowIconBg, dp(14f))
-        rowPickLabel.setTextColor(t.textPrimary)
-        rowPlaylist.background = roundRect(t.cardBg, dp(20f))
-        rowPlaylistIcon.background = roundRect(t.rowIconBg, dp(14f))
-        tvPlaylistTitle.setTextColor(t.textPrimary)
-        tvPlaylistSub.setTextColor(t.textMuted)
+        styleTriButtons(playActive = true, pauseActive = false, resumeActive = false)
+        btnStopAll.visibility = View.GONE
 
         cardStats.background = roundRect(t.cardBg, dp(20f))
         statsIcon.background = roundRect(Color.parseColor("#FFF0E3"), dp(14f))
         tvStatsMain.setTextColor(t.textPrimary)
-        tvStatsSub.setTextColor(t.textMuted)
         tvFooter.setTextColor(t.footer)
         tvSubtitle.setTextColor(Color.parseColor("#F0E3FB"))
 
@@ -921,6 +962,20 @@ class MainActivity : AppCompatActivity() {
     /* ================= کمکی‌ها ================= */
 
     private fun dp(v: Float): Float = v * resources.displayMetrics.density
+
+    /** افکت لمس: کوچک شدن ملایم کارت هنگام فشردن */
+    private fun pressScale(v: View) {
+        v.setOnTouchListener { vv, ev ->
+            when (ev.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN ->
+                    vv.animate().scaleX(0.97f).scaleY(0.97f).setDuration(90).start()
+                android.view.MotionEvent.ACTION_UP,
+                android.view.MotionEvent.ACTION_CANCEL ->
+                    vv.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+            }
+            false
+        }
+    }
 
     private fun gradient(colors: IntArray, radiusPx: Float = 0f): GradientDrawable {
         val gd = GradientDrawable(GradientDrawable.Orientation.TL_BR, colors)

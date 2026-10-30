@@ -46,7 +46,7 @@
                     android:layout_height="wrap_content"
                     android:text="🌙  خواب‌موزیک"
                     android:textColor="#FFFFFF"
-                    android:textSize="22sp"
+                    android:textSize="23sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -116,7 +116,7 @@
                             android:maxLines="1"
                             android:text="هیچ فایلی انتخاب نشده"
                             android:textColor="#1E3B33"
-                            android:textSize="13sp"
+                            android:textSize="14sp"
                             android:textStyle="bold" />
                     </LinearLayout>
 
@@ -151,7 +151,10 @@
                     android:layoutDirection="rtl"
                     android:layout_marginTop="4dp"
                     android:max="100"
-                    android:thumbOffset="6dp" />
+                    android:maxHeight="10dp"
+                    android:minHeight="10dp"
+                    android:thumb="@drawable/seek_thumb"
+                    android:thumbOffset="5dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -289,129 +292,101 @@
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- دکمه بزرگ گرادیانی پخش -->
+            <!-- ردیف دکمه‌های سه‌حالته: پخش / مکث / ادامه از همان ثانیه -->
             <LinearLayout
-                android:id="@+id/btnBig"
+                android:id="@+id/btnRow"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:background="@drawable/bg_bigbtn"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:paddingTop="13dp"
-                android:paddingBottom="13dp">
-
-                <TextView
-                    android:id="@+id/tvBigMain"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="▶   پخش"
-                    android:textColor="#FFFFFF"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tvBigSub"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="1dp"
-                    android:text="—:— تا خاموش شدن گوشی"
-                    android:textColor="#EAFBF3"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- ردیف انتخاب موسیقی از حافظه -->
-            <LinearLayout
-                android:id="@+id/rowPick"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:background="@drawable/bg_white_row"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="11dp">
-
-                <TextView
-                    android:id="@+id/rowPickIcon"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_chip"
-                    android:gravity="center"
-                    android:text="📂"
-                    android:textSize="14sp" />
-
-                <TextView
-                    android:id="@+id/rowPickLabel"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="9dp"
-                    android:layout_weight="1"
-                    android:text="انتخاب موسیقی از حافظه"
-                    android:textColor="#1E3B33"
-                    android:textSize="12.5sp"
-                    android:textStyle="bold" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="‹"
-                    android:textColor="#A8C6BC"
-                    android:textSize="16sp" />
-            </LinearLayout>
-
-            <!-- ردیف پلی‌لیست خواب (جدید) -->
-            <LinearLayout
-                android:id="@+id/rowPlaylist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:background="@drawable/bg_white_row"
-                android:gravity="center_vertical"
-                android:orientation="horizontal"
-                android:padding="11dp">
-
-                <TextView
-                    android:id="@+id/rowPlaylistIcon"
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:background="@drawable/bg_chip"
-                    android:gravity="center"
-                    android:text="🎼"
-                    android:textSize="14sp" />
+                android:orientation="horizontal">
 
                 <LinearLayout
+                    android:id="@+id/btnPlay"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="9dp"
+                    android:layout_marginEnd="4dp"
                     android:layout_weight="1"
-                    android:orientation="vertical">
+                    android:background="@drawable/bg_bigbtn"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
 
                     <TextView
-                        android:id="@+id/tvPlaylistTitle"
+                        android:id="@+id/tvBtnPlay"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="پلی‌لیست خواب"
-                        android:textColor="#1E3B33"
-                        android:textSize="12.5sp"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/tvPlaylistSub"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="چند آهنگ پشت‌سرهم تا خاموشی"
-                        android:textColor="#6B9588"
-                        android:textSize="9sp"
+                        android:text="▶ پخش"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13.5sp"
                         android:textStyle="bold" />
                 </LinearLayout>
 
+                <LinearLayout
+                    android:id="@+id/btnPause"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="4dp"
+                    android:layout_weight="1"
+                    android:background="@drawable/bg_bigbtn"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/tvBtnPause"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⏸ مکث"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/btnResume"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1.15"
+                    android:background="@drawable/bg_bigbtn"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:paddingTop="12dp"
+                    android:paddingBottom="12dp">
+
+                    <TextView
+                        android:id="@+id/tvBtnResume"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="▶ ادامه"
+                        android:textColor="#FFFFFF"
+                        android:textSize="13.5sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- توقف کامل و لغو خاموشی امشب — دکمه کوچک جدا؛ فقط هنگام پخش/مکث دیده می‌شود -->
+            <LinearLayout
+                android:id="@+id/btnStopAll"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="9dp"
+                android:background="@drawable/bg_stopall"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingTop="9dp"
+                android:paddingBottom="9dp"
+                android:visibility="gone">
+
                 <TextView
+                    android:id="@+id/tvStopAll"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="‹"
-                    android:textColor="#A8C6BC"
-                    android:textSize="16sp" />
+                    android:text="■  توقف کامل و لغو خاموشی امشب"
+                    android:textColor="#B91C1C"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
             </LinearLayout>
 
             <!-- کارت آمار شب‌های آرام -->
@@ -419,7 +394,7 @@
                 android:id="@+id/cardStats"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:background="@drawable/bg_white_row"
                 android:orientation="vertical"
                 android:padding="11dp">
@@ -452,17 +427,7 @@
                             android:layout_height="wrap_content"
                             android:text="۰ شب پشت‌سرهم با خواب‌موزیک خوابیدی 🌙"
                             android:textColor="#1E3B33"
-                            android:textSize="11.5sp"
-                            android:textStyle="bold" />
-
-                        <TextView
-                            android:id="@+id/tvStatsSub"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_marginTop="1dp"
-                            android:text="بهترین رکورد: ۰ شب — فقط داخل خود گوشی ذخیره می‌شود"
-                            android:textColor="#6B9588"
-                            android:textSize="9sp"
+                            android:textSize="12sp"
                             android:textStyle="bold" />
                     </LinearLayout>
                 </LinearLayout>
@@ -479,11 +444,11 @@
                 android:id="@+id/tvFooter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:gravity="center"
-                android:text="طراحی شده با ❤ برای آرامش شما — نسخه ۱.۴"
+                android:text="شب بخیر، خواب خوش 🌙"
                 android:textColor="#A8C6BC"
-                android:textSize="9sp"
+                android:textSize="9.5sp"
                 android:textStyle="bold" />
         </LinearLayout>
     </LinearLayout>

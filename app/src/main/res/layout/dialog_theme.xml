@@ -4,6 +4,7 @@
     android:layout_height="wrap_content">
 
     <LinearLayout
+        android:id="@+id/dlgThemeRoot"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@drawable/bg_dialog_lavender"
@@ -11,6 +12,7 @@
         android:padding="16dp">
 
         <TextView
+            android:id="@+id/dlgThemeTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
@@ -20,6 +22,7 @@
             android:textStyle="bold" />
 
         <TextView
+            android:id="@+id/dlgThemeSub"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"

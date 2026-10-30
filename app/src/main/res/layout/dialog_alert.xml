@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dlgAlertRoot"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/bg_card"
@@ -16,6 +17,7 @@
         android:textSize="20sp" />
 
     <TextView
+        android:id="@+id/dlgAlertTitle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
@@ -25,6 +27,7 @@
         android:textStyle="bold" />
 
     <TextView
+        android:id="@+id/dlgAlertSub"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="3dp"
@@ -36,7 +39,7 @@
 
     <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="10dp"
+        android:layout_height="12dp"
         android:layout_marginTop="10dp"
         android:background="@drawable/bg_alert_track">
 

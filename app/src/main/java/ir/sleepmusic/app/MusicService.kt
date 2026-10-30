@@ -28,8 +28,10 @@ import java.util.Locale
 /**
  * سرویس پخش موسیقی:
  * - پخش تک‌آهنگ یا پلی‌لیست (آهنگ‌ها به ترتیب؛ بعد از آخرین‌شان خاموشی)
+ * - مکث/ادامه: در مکث، چیپ «زمان خاموش شدن» فریز می‌شود و زنجیره‌ی خاموشی منتظر می‌ماند
  * - محو شدن صدا در ۱۰ ثانیه‌ی آخر + خبر دادن به صفحه اصلی برای هشدار ۱۰ ثانیه‌ای
  * - لغو خاموشی فقط همین اجرا را لغو می‌کند؛ زنجیره‌ی خاموشی (ActionExecutor) دست‌نخورده است
+ * - «توقف کامل» دیگر آمار شب‌ها را صفر نمی‌کند (درخواست کاربر)
  * نکته‌ی مهم فنی: فایل با FileDescriptor از ContentResolver باز می‌شود تا خطای -38 روی
  * مسیرهای فارسی/دارای فضاخالی هرگز تکرار نشود (همان روش پایدار نسخه‌ی ۱.۱).
  */
@@ -179,9 +181,31 @@ class MusicService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action
         if (action == ACTION_STOP) {
-            // توقف دستی کاربر = امشب زنجیره کامل نشد
-            resetStreak()
+            // توقف کامل: موسیقی قطع و خاموشی امشب لغو می‌شود؛ آمار شب‌ها دست‌نخورده می‌ماند
             stopEverything()
+            return START_NOT_STICKY
+        }
+        if (action == ACTION_PAUSE) {
+            val p = player
+            if (p != null && isPlaying) {
+                try { p.pause() } catch (_: Exception) { }
+                isPlaying = false
+                isPaused = true
+                tickHandler.removeCallbacks(ticker)
+                // هشدار ۱۰ ثانیه‌ای هم معطل می‌ماند؛ بعد از ادامه از نو نشان داده می‌شود
+                alertSent = false
+                broadcastAlertState("done")
+            }
+            return START_NOT_STICKY
+        }
+        if (action == ACTION_RESUME) {
+            val p = player
+            if (p != null && isPaused) {
+                try { p.start() } catch (_: Exception) { }
+                isPaused = false
+                isPlaying = true
+                tickHandler.post(ticker)
+            }
             return START_NOT_STICKY
         }
         if (action == ACTION_CANCEL_SHUTDOWN) {
@@ -372,15 +396,6 @@ class MusicService : Service() {
         } catch (_: Exception) { }
     }
 
-    private fun resetStreak() {
-        try {
-            val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
-            if (prefs.getInt("streak_nights", 0) != 0) {
-                prefs.edit().putInt("streak_nights", 0).apply()
-            }
-        } catch (_: Exception) { }
-    }
-
     private fun broadcastAlertState(state: String) {
         val i = Intent(ALERT_ACTION).setPackage(packageName)
         i.putExtra("state", state)
@@ -453,6 +468,7 @@ class MusicService : Service() {
 
     private fun stopEverything() {
         isPlaying = false
+        isPaused = false
         fadeRunning = false
         tickHandler.removeCallbacks(ticker)
         abandonAudioFocus()
@@ -470,6 +486,7 @@ class MusicService : Service() {
 
     override fun onDestroy() {
         isPlaying = false
+        isPaused = false
         fadeRunning = false
         tickHandler.removeCallbacks(ticker)
         abandonAudioFocus()
@@ -488,6 +505,8 @@ class MusicService : Service() {
         const val MODE_SINGLE = "single"
         const val MODE_PLAYLIST = "playlist"
         const val ACTION_STOP = "action_stop"
+        const val ACTION_PAUSE = "action_pause"
+        const val ACTION_RESUME = "action_resume"
         const val ACTION_CANCEL_SHUTDOWN = "action_cancel_shutdown"
         const val ACTION_SHUTDOWN_NOW = "action_shutdown_now"
         const val ACTION_SEEK = "action_seek"
@@ -498,6 +517,7 @@ class MusicService : Service() {
 
         // وضعیت پخش برای نمایش زنده رقص نور و چیپ‌ها در اکتیویتی
         @Volatile var isPlaying = false
+        @Volatile var isPaused = false
         @Volatile var positionSec = 0
         @Volatile var durationSec = 0
         @Volatile var audioSessionId = 0
