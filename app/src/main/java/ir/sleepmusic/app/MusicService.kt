@@ -17,6 +17,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.PowerManager
+import android.os.SystemClock
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import org.json.JSONArray
@@ -51,6 +52,12 @@ class MusicService : Service() {
     private var shutdownCancelled = false
     private var fadeRunning = false
 
+    // روش دوم (مستقل از موقعیت MediaPlayer): ساعت واقعی از لحظه شروع پخش
+    private var wallStartRealtime = 0L
+    private var wallDurMs = 0L
+    // پایان محوشدن بر اساس ساعت واقعی — برای محاسبه حجم
+    private var fadeEndRealtime = 0L
+
     // فوکوس صوتی: بعضی رام‌ها (مثل MIUI) بدون آن، صدا را درست مسیریابی نمی‌کنند
     private val focusListener = AudioManager.OnAudioFocusChangeListener { }
 
@@ -77,6 +84,7 @@ class MusicService : Service() {
                 positionSec = p.currentPosition / 1000
                 updateRemaining()
                 maybeStartAlertAndFade()
+                updateCountdownNotification()
                 tickHandler.postDelayed(this, 500)
             }
         }
@@ -125,7 +133,12 @@ class MusicService : Service() {
         }
     }
 
-    /** در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد) */
+    /**
+     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
+     * دو روش مستقل با هم چک می‌شوند تا حتی اگر mp3 طول را اشتباه گفت، باز هم فعال شود:
+     *   ۱) موقعیت MediaPlayer نسبت به duration
+     *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
+     */
     private fun maybeStartAlertAndFade() {
         val p = player ?: return
         if (alertSent || shutdownCancelled) return
@@ -133,32 +146,42 @@ class MusicService : Service() {
         if (!prefs.getBoolean("alert_enabled", true)) return
         val isLast = mode != MODE_PLAYLIST || queueIndex >= queueUris.size - 1
         if (!isLast) return
-        val remainingMs = (p.duration - p.currentPosition).coerceAtLeast(0)
+        val remainingPosMs = (p.duration.toLong() - p.currentPosition).coerceAtLeast(0)
+        val remainingWallMs = if (wallDurMs > 0) {
+            (wallDurMs - (SystemClock.elapsedRealtime() - wallStartRealtime)).coerceAtLeast(0)
+        } else {
+            Long.MAX_VALUE
+        }
+        val remainingMs = minOf(remainingPosMs, remainingWallMs)
         if (remainingMs in 1..10000) {
             alertSent = true
-            startFade(p)
+            startFade(p, remainingMs)
+            postAlertNotification(remainingMs)
             val alertIntent = Intent(ALERT_ACTION).setPackage(packageName)
-            alertIntent.putExtra("remaining_ms", remainingMs)
+            alertIntent.putExtra("remaining_ms", remainingMs.toInt())
             alertIntent.putExtra("state", "show")
             sendBroadcast(alertIntent)
         }
     }
 
-    /** کم شدن نرم صدا در ۱۰ ثانیه‌ی آخر تا خوابت را نپاشد */
-    private fun startFade(p: MediaPlayer) {
+    /** کم شدن نرم صدا در ۱۰ ثانیه‌ی آخر — با دو روش مستقل، هر کدام کمتر باشد اعمال می‌شود */
+    private fun startFade(p: MediaPlayer, remainingMs: Long) {
         if (fadeRunning) return
         fadeRunning = true
+        fadeEndRealtime = SystemClock.elapsedRealtime() + remainingMs
         val fadeRunnable = object : Runnable {
             override fun run() {
                 val pp = player
                 if (!fadeRunning || pp == null || pp !== p) return
-                val remainingMs = (pp.duration - pp.currentPosition).coerceAtLeast(0)
-                val vol = (remainingMs / 10000f).coerceIn(0.04f, 1f)
+                val remainingPos = (pp.duration.toLong() - pp.currentPosition).coerceAtLeast(0)
+                val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+                val remainingMsNow = minOf(remainingPos, remainingWall)
+                val vol = (remainingMsNow / 10000f).coerceIn(0.03f, 1f)
                 try { pp.setVolume(vol, vol) } catch (_: Exception) { }
-                if (remainingMs > 0) tickHandler.postDelayed(this, 400)
+                if (remainingMsNow > 0) tickHandler.postDelayed(this, 350)
             }
         }
-        tickHandler.postDelayed(fadeRunnable, 300)
+        tickHandler.postDelayed(fadeRunnable, 200)
     }
 
     /** برگرداندن نرم صدا بعد از لغو خاموشی */
@@ -175,6 +198,84 @@ class MusicService : Service() {
             }, (i * 250).toLong())
         }
     }
+
+    override fun onCreate() {
+        super.onCreate()
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= 26) {
+            // کانال اعلان فوری: بالای صفحه و بالای قفل با صدا و لرزش — برای هشدار ۱۰ ثانیه‌ای
+            val alertChannel = NotificationChannel(
+                ALERT_CHANNEL_ID, "هشدار ۱۰ ثانیه‌ای خاموشی", NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "۱۰ ثانیه قبل از خاموش شدن گوشی صدا و لرزش دارد و بالای قفل نشان داده می‌شود"
+                enableVibration(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            manager.createNotificationChannel(alertChannel)
+        }
+    }
+
+    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» */
+    private fun postAlertNotification(remainingMs: Long) {
+        alertRemainingMs = remainingMs
+        buildAlertNotification(remainingMs)
+    }
+
+    /** هر نیم ثانیه متن شمارش معکوس تازه می‌شود تا عدد روی قفل صفحه زنده بماند */
+    private fun updateCountdownNotification() {
+        if (!alertSent || shutdownCancelled) return
+        val p = player ?: return
+        val remainingPos = (p.duration.toLong() - p.currentPosition).coerceAtLeast(0)
+        val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
+        val remaining = minOf(remainingPos, remainingWall)
+        if (remaining <= 0) return
+        alertRemainingMs = remaining
+        buildAlertNotification(remaining)
+    }
+
+    private fun buildAlertNotification(remainingMs: Long) {
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val secs = ((remainingMs + 999) / 1000).toInt()
+        val cancelIt = PendingIntent.getService(
+            this, 12,
+            Intent(this, MusicService::class.java).setAction(ACTION_CANCEL_SHUTDOWN),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val doNow = PendingIntent.getService(
+            this, 13,
+            Intent(this, MusicService::class.java).setAction(ACTION_SHUTDOWN_NOW),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val openApp = PendingIntent.getActivity(
+            this, 10,
+            Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
+            .setContentTitle("⏰ " + faDigits("" + secs) + " ثانیه تا خاموش شدن گوشی")
+            .setContentText("صدای موسیقی کم می‌شود — اگر می‌خواهی بیداری، لغو کن")
+            .setSmallIcon(R.drawable.ic_launcher)
+            .setContentIntent(openApp)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .addAction(0, "لغو خاموشی", cancelIt)
+            .addAction(0, "خاموش کن", doNow)
+            .build()
+        try {
+            manager.notify(ALERT_NOTIF_ID, notification)
+        } catch (_: Exception) { }
+    }
+
+    private fun cancelAlertNotification() {
+        alertRemainingMs = 0
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        try { manager.cancel(ALERT_NOTIF_ID) } catch (_: Exception) { }
+    }
+
+    private fun faDigits(s: String): String = ThemeRepo.faDigits(s)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -194,6 +295,8 @@ class MusicService : Service() {
                 tickHandler.removeCallbacks(ticker)
                 // هشدار ۱۰ ثانیه‌ای هم معطل می‌ماند؛ بعد از ادامه از نو نشان داده می‌شود
                 alertSent = false
+                fadeRunning = false
+                cancelAlertNotification()
                 broadcastAlertState("done")
             }
             return START_NOT_STICKY
@@ -211,6 +314,7 @@ class MusicService : Service() {
         if (action == ACTION_CANCEL_SHUTDOWN) {
             shutdownCancelled = true
             fadeRunning = false
+            cancelAlertNotification()
             restoreVolume()
             Toast.makeText(this, "خاموشی لغو شد؛ موسیقی ادامه پیدا می‌کند", Toast.LENGTH_SHORT).show()
             return START_NOT_STICKY
@@ -227,7 +331,10 @@ class MusicService : Service() {
             val p = player
             if (ms >= 0 && p != null) {
                 try {
+                    val oldPos = p.currentPosition
                     p.seekTo(ms)
+                    // ساعت واقعی هم با همان جابه‌جایی اصلاح می‌شود تا روش دوم همیشه درست بماند
+                    wallStartRealtime += (oldPos - ms)
                     positionSec = ms / 1000
                     updateRemaining()
                 } catch (_: Exception) { }
@@ -315,6 +422,9 @@ class MusicService : Service() {
                 trackIndex = queueIndex
                 trackCount = queueUris.size
                 modeLive = mode
+                // روش دوم (ساعت واقعی) از همین لحظه شروع می‌شود
+                wallStartRealtime = SystemClock.elapsedRealtime()
+                wallDurMs = prepared.duration.toLong()
                 updateRemaining()
                 tickHandler.post(ticker)
             }
@@ -331,6 +441,7 @@ class MusicService : Service() {
                         // زنجیره‌ی خاموشی واقعی — عیناً مثل نسخه‌هایی که تست شده
                         ActionExecutor.execute(this@MusicService, prefs.getBoolean("power_menu", true))
                     }
+                    cancelAlertNotification()
                     broadcastAlertState("done")
                     stopEverything()
                 }
@@ -480,6 +591,7 @@ class MusicService : Service() {
         positionSec = 0
         remainingSec = 0
         audioSessionId = 0
+        cancelAlertNotification()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -513,7 +625,9 @@ class MusicService : Service() {
         const val EXTRA_SEEK_MS = "extra_seek_ms"
         const val ALERT_ACTION = "ir.sleepmusic.app.TEN_SECOND_ALERT"
         const val CHANNEL_ID = "music_playback"
+        const val ALERT_CHANNEL_ID = "shutdown_alert"
         const val NOTIFICATION_ID = 1
+        const val ALERT_NOTIF_ID = 2
 
         // وضعیت پخش برای نمایش زنده رقص نور و چیپ‌ها در اکتیویتی
         @Volatile var isPlaying = false
@@ -526,5 +640,6 @@ class MusicService : Service() {
         @Volatile var trackIndex = 0
         @Volatile var trackCount = 0
         @Volatile var modeLive = ""
+        @Volatile var alertRemainingMs = 0L
     }
 }

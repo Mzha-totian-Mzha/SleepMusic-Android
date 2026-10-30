@@ -72,12 +72,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvChipBValue: TextView
 
     // دکمه‌های سه‌حالته + توقف کامل
-    private lateinit var btnPlay: LinearLayout
-    private lateinit var btnPause: LinearLayout
-    private lateinit var btnResume: LinearLayout
-    private lateinit var tvBtnPlay: TextView
-    private lateinit var tvBtnPause: TextView
-    private lateinit var tvBtnResume: TextView
+    private lateinit var btnMain: LinearLayout
+    private lateinit var tvBtnMain: TextView
     private lateinit var btnStopAll: LinearLayout
     private lateinit var cardStats: LinearLayout
     private lateinit var statsIcon: TextView
@@ -117,7 +113,7 @@ class MainActivity : AppCompatActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             updatePlaybackUi()
-            uiHandler.postDelayed(this, 500)
+            uiHandler.postDelayed(this, 300)
         }
     }
 
@@ -204,15 +200,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btnSettings).setOnClickListener { showSettingsDialog() }
 
-        btnPlay.setOnClickListener { startPlayback() }
-        btnPause.setOnClickListener {
-            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_PAUSE))
-            Toast.makeText(this, "در مکث؛ چیپ «زمان خاموش شدن» فریز شد", Toast.LENGTH_SHORT).show()
-        }
-        btnResume.setOnClickListener {
-            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_RESUME))
-            Toast.makeText(this, "ادامه از همان ثانیه؛ شمارش خاموشی هم ادامه پیدا کرد", Toast.LENGTH_SHORT).show()
-        }
+        btnMain.setOnClickListener { onMainButton() }
         btnStopAll.setOnClickListener {
             startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_STOP))
             Toast.makeText(this, "توقف کامل شد؛ خاموشی امشب لغو شد", Toast.LENGTH_SHORT).show()
@@ -277,12 +265,8 @@ class MainActivity : AppCompatActivity() {
         chipBIcon = findViewById(R.id.chipBIcon)
         tvChipBLabel = findViewById(R.id.tvChipBLabel)
         tvChipBValue = findViewById(R.id.tvChipBValue)
-        btnPlay = findViewById(R.id.btnPlay)
-        btnPause = findViewById(R.id.btnPause)
-        btnResume = findViewById(R.id.btnResume)
-        tvBtnPlay = findViewById(R.id.tvBtnPlay)
-        tvBtnPause = findViewById(R.id.tvBtnPause)
-        tvBtnResume = findViewById(R.id.tvBtnResume)
+        btnMain = findViewById(R.id.btnMain)
+        tvBtnMain = findViewById(R.id.tvBtnMain)
         btnStopAll = findViewById(R.id.btnStopAll)
         cardStats = findViewById(R.id.cardStats)
         statsIcon = findViewById(R.id.statsIcon)
@@ -290,8 +274,7 @@ class MainActivity : AppCompatActivity() {
         statsDots = findViewById(R.id.statsDots)
         tvFooter = findViewById(R.id.tvFooter)
         equalizerView.setPlaying(false)
-        pressScale(btnPlay); pressScale(btnPause); pressScale(btnResume)
-        pressScale(btnStopAll); pressScale(cardStats)
+        pressScale(btnMain); pressScale(btnStopAll); pressScale(cardStats)
         findViewById<View>(R.id.btnSettings).let { pressScale(it) }
     }
 
@@ -320,7 +303,7 @@ class MainActivity : AppCompatActivity() {
         Toast.makeText(this, "پخش شروع شد؛ درست بعد از پایان موسیقی گوشی خاموش می‌شود", Toast.LENGTH_LONG).show()
     }
 
-    /** به‌روزرسانی زنده: سه دکمه، چیپ‌ها، نوار پیشرفت و رقص نور */
+    /** به‌روزرسانی زنده: دکمه‌ی یکپارچه، چیپ‌ها، نوار پیشرفت و رقص نور */
     private fun updatePlaybackUi() {
         val playing = MusicService.isPlaying
         val paused = MusicService.isPaused
@@ -340,14 +323,13 @@ class MainActivity : AppCompatActivity() {
             tvPlayPill.text = "در حال پخش"
             val dur = MusicService.durationSec
             if (dur > 0) {
-                seekBar.max = dur
+                if (seekBar.max != dur) seekBar.max = dur
                 tvTimeTotal.text = ThemeRepo.formatSecs(dur)
                 if (!seekDragging) seekBar.progress = MusicService.positionSec.coerceIn(0, dur)
             }
             tvTimeElapsed.text = ThemeRepo.formatSecs(MusicService.positionSec)
             tvChipAValue.text = faDigits(ThemeRepo.formatSecs(MusicService.remainingSec)) + " دیگر"
-            styleTriButtons(playActive = false, pauseActive = true, resumeActive = false)
-            tvBtnResume.text = "▶ ادامه از " + faDigits(ThemeRepo.formatSecs(MusicService.positionSec))
+            styleMainBtn("pause")
             btnStopAll.visibility = View.VISIBLE
         } else if (paused) {
             tvPlayerStatus.text = "در مکث — خاموشی هم معطل مانده"
@@ -355,8 +337,7 @@ class MainActivity : AppCompatActivity() {
             tvPlayPill.text = "مکث"
             // نوار پیشرفت و چیپ زمان همین‌جا فریز می‌مانند؛ دست نمی‌زنیم
             tvChipAValue.text = faDigits(ThemeRepo.formatSecs(MusicService.remainingSec)) + " دیگر"
-            styleTriButtons(playActive = false, pauseActive = false, resumeActive = true)
-            tvBtnResume.text = "▶ ادامه از " + faDigits(ThemeRepo.formatSecs(MusicService.positionSec))
+            styleMainBtn("resume")
             btnStopAll.visibility = View.VISIBLE
         } else {
             tvPlayerStatus.text = "آماده برای پخش"
@@ -367,8 +348,7 @@ class MainActivity : AppCompatActivity() {
                 tvTimeElapsed.text = "00:00"
             }
             tvChipAValue.text = faDigits(ThemeRepo.formatSecs(idleTotalSec())) + " دیگر"
-            styleTriButtons(playActive = true, pauseActive = false, resumeActive = false)
-            tvBtnResume.text = "▶ ادامه"
+            styleMainBtn("play")
             btnStopAll.visibility = View.GONE
         }
         tvChipBValue.text = if (playlistNow.size > 1) {
@@ -378,17 +358,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** حالت بصری سه دکمه: فعال با تم کامل، غیرفعال محو */
-    private fun styleTriButtons(playActive: Boolean, pauseActive: Boolean, resumeActive: Boolean) {
-        fun st(v: LinearLayout, active: Boolean) {
-            v.background = gradient(theme.btnColors, dp(18f))
-            v.alpha = if (active) 1f else 0.38f
-            v.isClickable = active
-            v.isEnabled = active
+    /** دکمه‌ی یکپارچه: لمس بر اساس حالت فعلی پخش تصمیم می‌گیرد */
+    private fun onMainButton() {
+        when {
+            MusicService.isPlaying -> {
+                startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_PAUSE))
+                Toast.makeText(this, "در مکث؛ چیپ «زمان خاموش شدن» فریز شد", Toast.LENGTH_SHORT).show()
+            }
+            MusicService.isPaused -> {
+                startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_RESUME))
+                Toast.makeText(this, "ادامه از همان ثانیه؛ شمارش خاموشی هم ادامه پیدا کرد", Toast.LENGTH_SHORT).show()
+            }
+            else -> startPlayback()
         }
-        st(btnPlay, playActive)
-        st(btnPause, pauseActive)
-        st(btnResume, resumeActive)
+    }
+
+    /** حالت بصری دکمه‌ی یکپارچه: پخش ⇄ مکث ⇄ ادامه از همان ثانیه — با خط دور تم */
+    private fun styleMainBtn(state: String) {
+        btnMain.background = gradient(theme.btnColors, dp(18f), dp(2f).toInt(), borderColor())
+        when (state) {
+            "pause" -> tvBtnMain.text = "⏸ مکث"
+            "resume" -> tvBtnMain.text = "▶ ادامه از " + faDigits(ThemeRepo.formatSecs(MusicService.positionSec))
+            else -> tvBtnMain.text = "▶ پخش"
+        }
     }
 
     private fun idleTotalSec(): Int {
@@ -458,7 +450,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         // تم روی همه‌ی پنجره‌ها — تنظیمات هم با پالت تم فعلی رندر می‌شود
-        dialog.findViewById<LinearLayout>(R.id.dlgSettingsRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<LinearLayout>(R.id.dlgSettingsRoot)!!.background = roundRectStroke(theme.cardBg, dp(29f))
         dialog.findViewById<TextView>(R.id.dlgSettingsTitle)!!.setTextColor(theme.progressColor)
         dialog.findViewById<TextView>(R.id.dlgSettingsSub)!!.setTextColor(theme.textMuted)
         dialog.findViewById<TextView>(R.id.btnCloseSettings)!!.setTextColor(theme.progressColor)
@@ -481,6 +473,13 @@ class MainActivity : AppCompatActivity() {
             tvPillAccess.text = if (acc) "فعال ✅" else "غیرفعال"
         }
         refreshPills()
+
+        // خط دور همه ردیف‌ها + رنگ دایره‌های شماره از خود تم (دیگر بنفش ثابت نیست)
+        for (rowId in intArrayOf(R.id.rowTheme, R.id.rowPlaylist, R.id.rowMusic, R.id.rowAlert, R.id.rowStats, R.id.rowAccess)) {
+            val row = dialog.findViewById<LinearLayout>(rowId)
+            row.background = roundRectStroke(Color.WHITE, dp(18f))
+            (row.getChildAt(0) as? TextView)?.background = ovalGradient(theme.btnColors)
+        }
 
         dialog.findViewById<LinearLayout>(R.id.rowTheme).setOnClickListener {
             dialog.dismiss()
@@ -527,7 +526,7 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.92f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        dialog.findViewById<LinearLayout>(R.id.dlgThemeRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<LinearLayout>(R.id.dlgThemeRoot)!!.background = roundRectStroke(theme.cardBg, dp(29f))
         dialog.findViewById<TextView>(R.id.dlgThemeTitle)!!.setTextColor(theme.progressColor)
         dialog.findViewById<TextView>(R.id.dlgThemeSub)!!.setTextColor(theme.textMuted)
         dialog.findViewById<TextView>(R.id.btnCloseTheme)!!.setTextColor(theme.progressColor)
@@ -541,14 +540,14 @@ class MainActivity : AppCompatActivity() {
                 row.orientation = LinearLayout.HORIZONTAL
                 row.gravity = android.view.Gravity.CENTER_VERTICAL
                 row.setPadding(dp(10f).toInt(), dp(10f).toInt(), dp(10f).toInt(), dp(10f).toInt())
-                row.background = roundRect(Color.WHITE, dp(18f))
+                row.background = roundRectStroke(Color.WHITE, dp(18f))
 
                 val num = TextView(this)
                 num.text = th.num
                 num.setTextColor(Color.WHITE)
                 num.textSize = 14f
                 num.gravity = android.view.Gravity.CENTER
-                num.background = getDrawable(R.drawable.bg_num_circle)
+                num.background = ovalGradient(th.btnColors)
                 num.layoutParams = LinearLayout.LayoutParams(dp(32f).toInt(), dp(32f).toInt())
                 row.addView(num)
 
@@ -619,7 +618,7 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.92f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        dialog.findViewById<LinearLayout>(R.id.dlgPlaylistRoot)!!.background = roundRect(theme.cardBg, dp(29f))
+        dialog.findViewById<LinearLayout>(R.id.dlgPlaylistRoot)!!.background = roundRectStroke(theme.cardBg, dp(29f))
         dialog.findViewById<TextView>(R.id.dlgPlaylistTitle)!!.setTextColor(theme.progressColor)
         dialog.findViewById<TextView>(R.id.dlgPlaylistSub)!!.setTextColor(theme.textMuted)
         dialog.findViewById<TextView>(R.id.btnClosePlaylist)!!.setTextColor(theme.progressColor)
@@ -647,14 +646,14 @@ class MainActivity : AppCompatActivity() {
                 row.orientation = LinearLayout.HORIZONTAL
                 row.gravity = android.view.Gravity.CENTER_VERTICAL
                 row.setPadding(dp(10f).toInt(), dp(10f).toInt(), dp(10f).toInt(), dp(10f).toInt())
-                row.background = roundRect(Color.WHITE, dp(18f))
+                row.background = roundRectStroke(Color.WHITE, dp(18f))
 
                 val num = TextView(this)
                 num.text = faDigits("" + (idx + 1))
                 num.setTextColor(Color.WHITE)
                 num.textSize = 13f
                 num.gravity = android.view.Gravity.CENTER
-                num.background = getDrawable(R.drawable.bg_num_circle)
+                num.background = ovalGradient(theme.btnColors)
                 num.layoutParams = LinearLayout.LayoutParams(dp(30f).toInt(), dp(30f).toInt())
                 row.addView(num)
 
@@ -680,13 +679,13 @@ class MainActivity : AppCompatActivity() {
                 pills.layoutParams = plp
                 val dur = TextView(this)
                 dur.text = if (tr.durSec > 0) faDigits(ThemeRepo.formatSecs(tr.durSec)) else "…"
-                pills.addView(miniPill(dur, Color.parseColor("#FFF4EC"), Color.parseColor("#EA580C")))
+                pills.addView(miniPill(dur, theme.chipABg, theme.chipAIcon))
                 val nth = TextView(this)
                 nth.text = "آهنگ " + faDigits("" + (idx + 1))
                 val nlp = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 nlp.marginStart = dp(5f).toInt()
                 nth.layoutParams = nlp
-                pills.addView(miniPill(nth, Color.parseColor("#F3EEFE"), Color.parseColor("#6D28D9")))
+                pills.addView(miniPill(nth, theme.rowIconBg, theme.rowIconColor))
                 mid.addView(pills)
                 row.addView(mid)
 
@@ -799,10 +798,10 @@ class MainActivity : AppCompatActivity() {
             (resources.displayMetrics.widthPixels * 0.86f).toInt(),
             ViewGroup.LayoutParams.WRAP_CONTENT
         )
-        dialog.findViewById<LinearLayout>(R.id.dlgAlertRoot)!!.background = roundRect(theme.cardBg, dp(22f))
+        dialog.findViewById<LinearLayout>(R.id.dlgAlertRoot)!!.background = roundRectStroke(theme.cardBg, dp(22f))
         dialog.findViewById<TextView>(R.id.dlgAlertTitle)!!.setTextColor(theme.textPrimary)
         dialog.findViewById<TextView>(R.id.dlgAlertSub)!!.setTextColor(theme.textMuted)
-        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.background = gradient(theme.btnColors, dp(14f))
+        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.background = gradient(theme.btnColors, dp(14f), dp(2f).toInt(), borderColor())
         dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setTextColor(theme.textMuted)
         val bar = dialog.findViewById<View>(R.id.alertBar)
         alertBar = bar
@@ -924,33 +923,33 @@ class MainActivity : AppCompatActivity() {
         rootScroll.setBackgroundColor(t.bodyBg)
         headerFrame.background = gradient(t.headerColors)
 
-        cardPlayer.background = roundRect(t.cardBg, dp(26f))
-        iconMusicBox.background = roundRect(t.rowIconBg, dp(14f))
+        cardPlayer.background = roundRectStroke(t.cardBg, dp(26f))
+        iconMusicBox.background = roundRectStroke(t.rowIconBg, dp(14f))
         tvMusicLabel.setTextColor(t.textFaint)
         tvSelectedMusic.setTextColor(t.textPrimary)
         seekBar.progressTintList = ColorStateList.valueOf(t.progressColor)
         seekBar.progressBackgroundTintList = ColorStateList.valueOf(t.textFaint)
-        seekBar.thumbTintList = ColorStateList.valueOf(Color.WHITE)
+        seekBar.thumb = thumbDrawable(t)
         tvTimeElapsed.setTextColor(t.textMuted)
         tvPlayerStatus.setTextColor(t.textFaint)
         tvTimeTotal.setTextColor(t.textMuted)
 
-        chipA.background = roundRect(t.chipABg, dp(18f))
-        chipAIcon.background = roundRect(Color.WHITE, dp(12f))
+        chipA.background = roundRectStroke(t.chipABg, dp(18f))
+        chipAIcon.background = roundRectStroke(Color.WHITE, dp(12f))
         chipAIcon.setTextColor(t.chipAIcon)
         tvChipALabel.setTextColor(t.textFaint)
         tvChipAValue.setTextColor(t.textPrimary)
-        chipB.background = roundRect(t.chipBBg, dp(18f))
-        chipBIcon.background = roundRect(Color.WHITE, dp(12f))
+        chipB.background = roundRectStroke(t.chipBBg, dp(18f))
+        chipBIcon.background = roundRectStroke(Color.WHITE, dp(12f))
         chipBIcon.setTextColor(t.chipBIcon)
         tvChipBLabel.setTextColor(t.textFaint)
         tvChipBValue.setTextColor(t.textPrimary)
 
-        styleTriButtons(playActive = true, pauseActive = false, resumeActive = false)
-        btnStopAll.visibility = View.GONE
+        styleMainBtn(if (MusicService.isPlaying) "pause" else if (MusicService.isPaused) "resume" else "play")
+        btnStopAll.visibility = if (MusicService.isPlaying || MusicService.isPaused) View.VISIBLE else View.GONE
 
-        cardStats.background = roundRect(t.cardBg, dp(20f))
-        statsIcon.background = roundRect(Color.parseColor("#FFF0E3"), dp(14f))
+        cardStats.background = roundRectStroke(t.cardBg, dp(20f))
+        statsIcon.background = roundRectStroke(Color.parseColor("#FFF0E3"), dp(14f))
         tvStatsMain.setTextColor(t.textPrimary)
         tvFooter.setTextColor(t.footer)
         tvSubtitle.setTextColor(Color.parseColor("#F0E3FB"))
@@ -977,10 +976,42 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun gradient(colors: IntArray, radiusPx: Float = 0f): GradientDrawable {
+    private fun gradient(
+        colors: IntArray,
+        radiusPx: Float = 0f,
+        strokeW: Int = 0,
+        strokeColor: Int = 0
+    ): GradientDrawable {
         val gd = GradientDrawable(GradientDrawable.Orientation.TL_BR, colors)
         if (radiusPx > 0f) gd.cornerRadius = radiusPx
+        if (strokeW > 0) gd.setStroke(strokeW, strokeColor)
         return gd
+    }
+
+    /** رنگ خط دور کارت‌ها و دکمه‌ها — از رنگ خود تم؛ واضح ولی نه خیلی کلفت */
+    private fun borderColor(): Int = Color.argb(140, Color.red(theme.progressColor), Color.green(theme.progressColor), Color.blue(theme.progressColor))
+
+    /** مستطیل گرد با خط دور ۲dp به رنگ تم — درخواست کاربر: دور تا دور همه کارت‌ها */
+    private fun roundRectStroke(color: Int, radiusPx: Float): GradientDrawable {
+        val gd = roundRect(color, radiusPx)
+        gd.setStroke(dp(2f).toInt(), borderColor())
+        return gd
+    }
+
+    /** دسته‌ی سفید ۲۰dp با دور رنگی تم — روی کارت سفید کاملا دیده می‌شود */
+    private fun thumbDrawable(t: AppTheme): GradientDrawable {
+        val gd = GradientDrawable()
+        gd.shape = GradientDrawable.OVAL
+        gd.setColor(Color.WHITE)
+        gd.setSize(dp(20f).toInt(), dp(20f).toInt())
+        gd.setStroke(dp(2.5f).toInt(), t.progressColor)
+        return gd
+    }
+
+    private fun ovalGradient(colors: IntArray): GradientDrawable {
+        return GradientDrawable(GradientDrawable.Orientation.TL_BR, colors).apply {
+            shape = GradientDrawable.OVAL
+        }
     }
 
     private fun roundRect(color: Int, radiusPx: Float): GradientDrawable {
@@ -1013,7 +1044,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pill(tv: TextView, bg: Int, fg: Int) {
-        tv.background = roundRect(bg, dp(99f))
+        val gd = roundRect(bg, dp(99f))
+        gd.setStroke(dp(1.5f).toInt(), borderColor())
+        tv.background = gd
         tv.setTextColor(fg)
     }
 
