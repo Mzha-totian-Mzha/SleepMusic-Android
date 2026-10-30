@@ -36,7 +36,7 @@ import java.util.Locale
 
 /**
  * صفحه اصلی — دقیقاً مطابق طراحی تأییدشده:
- * - هدر با تنها یک دکمه: چرخ‌دنده تنظیمات (تم، پلی‌لیست، موسیقی، هشدار، آمار، دسترسی‌پذیری)
+ * - هدر با تنها یک دکمه: چرخ‌دنده تنظیمات (تم، پلی‌لیست، موسیقی، هشدار، آمار، حالت شب خودکار)
  * - کارت پلیر با رقص نور تم‌دار، نوار پیشرفت قابل کشیدن (راست‌به‌چپ) و چیپ زمان خاموش شدن
  * - دکمه بزرگ پخش: بعد از پایان موسیقی (یا آخرین آهنگ پلی‌لیست) گوشی خاموش می‌شود
  * - هشدار ۱۰ ثانیه‌ای + محو شدن صدا؛ آمار شب‌های آرام پایین صفحه
@@ -182,7 +182,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         bindViews()
-        theme = ThemeRepo.byId(prefs.getString("theme_id", "blend"))
+        theme = effectiveTheme()
         applyTheme(theme)
 
         val savedUri = prefs.getString("music_uri", null)
@@ -225,6 +225,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        MusicService.appInForeground = true
+        maybeRefreshNightTheme()
         uiHandler.post(ticker)
         refreshStats()
         footerHandler.removeCallbacks(footerTicker)
@@ -233,8 +235,37 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPause() {
         super.onPause()
+        MusicService.appInForeground = false
         uiHandler.removeCallbacks(ticker)
         footerHandler.removeCallbacks(footerTicker)
+    }
+
+    /** تغییر حالت روشن/تاریک گوشی وسط کار برنامه — بدون ساختن دوباره‌ی اکتیویتی */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        maybeRefreshNightTheme()
+    }
+
+    /** گوشی در حالت تاریک است؟ */
+    private fun isSystemDarkMode(): Boolean {
+        val mask = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        return mask == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
+    /** تم مؤثر: اگر «حالت شب خودکار» روشن باشد و گوشی تاریک باشد → تم «شب تیره»؛ وگرنه تم خود کاربر */
+    private fun effectiveTheme(): AppTheme {
+        val saved = ThemeRepo.byId(prefs.getString("theme_id", "blend"))
+        return if (prefs.getBoolean("night_auto_enabled", false) && isSystemDarkMode()) ThemeRepo.byId("night") else saved
+    }
+
+    /** اگر تم مؤثر عوض شده، همین حالا اعمال کن (بدون بستن برنامه) */
+    private fun maybeRefreshNightTheme() {
+        if (!prefs.getBoolean("night_auto_enabled", false)) return
+        val t = effectiveTheme()
+        if (t.id != theme.id) {
+            theme = t
+            applyTheme(t)
+        }
     }
 
     override fun onDestroy() {
@@ -459,7 +490,7 @@ class MainActivity : AppCompatActivity() {
         tvPillTheme.text = "۹ تم"
         val tvPillAlert = dialog.findViewById<TextView>(R.id.tvPillAlert)
         val tvPillStats = dialog.findViewById<TextView>(R.id.tvPillStats)
-        val tvPillAccess = dialog.findViewById<TextView>(R.id.tvPillAccess)
+        val tvPillNight = dialog.findViewById<TextView>(R.id.tvPillNight)
 
         fun refreshPills() {
             val alertOn = prefs.getBoolean("alert_enabled", true)
@@ -468,14 +499,14 @@ class MainActivity : AppCompatActivity() {
             val statsOn = prefs.getBoolean("stats_enabled", true)
             pill(tvPillStats, if (statsOn) 0xFFD1FAE5.toInt() else 0xFFE5E7EB.toInt(), if (statsOn) 0xFF047857.toInt() else 0xFF6B7280.toInt())
             tvPillStats.text = if (statsOn) "روشن" else "خاموش"
-            val acc = accessibilityEnabled()
-            pill(tvPillAccess, if (acc) 0xFFD1FAE5.toInt() else 0xFFFFF4EC.toInt(), if (acc) 0xFF047857.toInt() else 0xFFEA580C.toInt())
-            tvPillAccess.text = if (acc) "فعال ✅" else "غیرفعال"
+            val nightOn = prefs.getBoolean("night_auto_enabled", false)
+            pill(tvPillNight, if (nightOn) 0xFFD1FAE5.toInt() else 0xFFE5E7EB.toInt(), if (nightOn) 0xFF047857.toInt() else 0xFF6B7280.toInt())
+            tvPillNight.text = if (nightOn) "روشن" else "خاموش"
         }
         refreshPills()
 
         // خط دور همه ردیف‌ها + رنگ دایره‌های شماره از خود تم (دیگر بنفش ثابت نیست)
-        for (rowId in intArrayOf(R.id.rowTheme, R.id.rowPlaylist, R.id.rowMusic, R.id.rowAlert, R.id.rowStats, R.id.rowAccess)) {
+        for (rowId in intArrayOf(R.id.rowTheme, R.id.rowPlaylist, R.id.rowMusic, R.id.rowAlert, R.id.rowStats, R.id.rowNight)) {
             val row = dialog.findViewById<LinearLayout>(rowId)
             row.background = roundRectStroke(Color.WHITE, dp(18f))
             (row.getChildAt(0) as? TextView)?.background = ovalGradient(theme.btnColors)
@@ -504,13 +535,11 @@ class MainActivity : AppCompatActivity() {
             cardStats.visibility = if (next) View.VISIBLE else View.GONE
             refreshPills()
         }
-        dialog.findViewById<LinearLayout>(R.id.rowAccess).setOnClickListener {
-            if (accessibilityEnabled()) {
-                Toast.makeText(this, "سرویس خاموشی فعال است ✅", Toast.LENGTH_SHORT).show()
-            } else {
-                Toast.makeText(this, "«خواب‌موزیک» را پیدا کن و سرویس را روشن کن", Toast.LENGTH_LONG).show()
-                try { startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS)) } catch (_: Exception) { }
-            }
+        dialog.findViewById<LinearLayout>(R.id.rowNight).setOnClickListener {
+            val next = !prefs.getBoolean("night_auto_enabled", false)
+            prefs.edit().putBoolean("night_auto_enabled", next).apply()
+            refreshPills()
+            maybeRefreshNightTheme()
         }
         dialog.findViewById<TextView>(R.id.btnCloseSettings).setOnClickListener { dialog.dismiss() }
         dialog.show()
@@ -925,13 +954,13 @@ class MainActivity : AppCompatActivity() {
 
         cardPlayer.background = roundRectStroke(t.cardBg, dp(26f))
         iconMusicBox.background = roundRectStroke(t.rowIconBg, dp(14f))
-        tvMusicLabel.setTextColor(t.textFaint)
+        tvMusicLabel.setTextColor(t.textMuted)
         tvSelectedMusic.setTextColor(t.textPrimary)
         seekBar.progressTintList = ColorStateList.valueOf(t.progressColor)
         seekBar.progressBackgroundTintList = ColorStateList.valueOf(t.textFaint)
         seekBar.thumb = thumbDrawable(t)
         tvTimeElapsed.setTextColor(t.textMuted)
-        tvPlayerStatus.setTextColor(t.textFaint)
+        tvPlayerStatus.setTextColor(t.textMuted)
         tvTimeTotal.setTextColor(t.textMuted)
 
         chipA.background = roundRectStroke(t.chipABg, dp(18f))
@@ -951,7 +980,7 @@ class MainActivity : AppCompatActivity() {
         cardStats.background = roundRectStroke(t.cardBg, dp(20f))
         statsIcon.background = roundRectStroke(Color.parseColor("#FFF0E3"), dp(14f))
         tvStatsMain.setTextColor(t.textPrimary)
-        tvFooter.setTextColor(t.footer)
+        tvFooter.setTextColor(t.textMuted)
         tvSubtitle.setTextColor(Color.parseColor("#F0E3FB"))
 
         equalizerView.setPalette(t.eqColors)

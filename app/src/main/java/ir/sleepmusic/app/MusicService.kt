@@ -57,6 +57,8 @@ class MusicService : Service() {
     private var wallDurMs = 0L
     // پایان محوشدن بر اساس ساعت واقعی — برای محاسبه حجم
     private var fadeEndRealtime = 0L
+    // اعلان هشدار الان روی نوار اعلان است؟ (برای برداشتنش وقتی اپ برگشت پیش‌زمینه)
+    private var alertNotifActive = false
 
     // فوکوس صوتی: بعضی رام‌ها (مثل MIUI) بدون آن، صدا را درست مسیریابی نمی‌کنند
     private val focusListener = AudioManager.OnAudioFocusChangeListener { }
@@ -84,7 +86,7 @@ class MusicService : Service() {
                 positionSec = p.currentPosition / 1000
                 updateRemaining()
                 maybeStartAlertAndFade()
-                updateCountdownNotification()
+                handleAlertUi()
                 tickHandler.postDelayed(this, 500)
             }
         }
@@ -135,6 +137,8 @@ class MusicService : Service() {
 
     /**
      * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
+     * پاپ‌آپ درون برنامه (همان تصویر تأییدشده) همیشه با برادکست نشان داده می‌شود؛
+     * اعلان قفل صفحه فقط وقتی ساخته می‌شود که اپ در پیش‌زمینه نیست.
      * دو روش مستقل با هم چک می‌شوند تا حتی اگر mp3 طول را اشتباه گفت، باز هم فعال شود:
      *   ۱) موقعیت MediaPlayer نسبت به duration
      *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
@@ -156,7 +160,6 @@ class MusicService : Service() {
         if (remainingMs in 1..10000) {
             alertSent = true
             startFade(p, remainingMs)
-            postAlertNotification(remainingMs)
             val alertIntent = Intent(ALERT_ACTION).setPackage(packageName)
             alertIntent.putExtra("remaining_ms", remainingMs.toInt())
             alertIntent.putExtra("state", "show")
@@ -215,15 +218,17 @@ class MusicService : Service() {
         }
     }
 
-    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» */
-    private fun postAlertNotification(remainingMs: Long) {
-        alertRemainingMs = remainingMs
-        buildAlertNotification(remainingMs)
-    }
-
-    /** هر نیم ثانیه متن شمارش معکوس تازه می‌شود تا عدد روی قفل صفحه زنده بماند */
-    private fun updateCountdownNotification() {
+    /**
+     * هر نیم ثانیه چک می‌شود:
+     *   اپ جلوی چشم است  → پاپ‌آپ درون برنامه کار می‌کند؛ اعلان را بردار (برگشت از پس‌زمینه)
+     *   اپ در پس‌زمینه است → اعلان قفل صفحه با شمارش معکوس زنده نشان بده
+     */
+    private fun handleAlertUi() {
         if (!alertSent || shutdownCancelled) return
+        if (appInForeground) {
+            if (alertNotifActive) cancelAlertNotification()
+            return
+        }
         val p = player ?: return
         val remainingPos = (p.duration.toLong() - p.currentPosition).coerceAtLeast(0)
         val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
@@ -233,6 +238,7 @@ class MusicService : Service() {
         buildAlertNotification(remaining)
     }
 
+    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» — فقط برای وقتی اپ در پیش‌زمینه نیست */
     private fun buildAlertNotification(remainingMs: Long) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val secs = ((remainingMs + 999) / 1000).toInt()
@@ -264,6 +270,7 @@ class MusicService : Service() {
             .addAction(0, "لغو خاموشی", cancelIt)
             .addAction(0, "خاموش کن", doNow)
             .build()
+        alertNotifActive = true
         try {
             manager.notify(ALERT_NOTIF_ID, notification)
         } catch (_: Exception) { }
@@ -271,6 +278,7 @@ class MusicService : Service() {
 
     private fun cancelAlertNotification() {
         alertRemainingMs = 0
+        alertNotifActive = false
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         try { manager.cancel(ALERT_NOTIF_ID) } catch (_: Exception) { }
     }
@@ -641,5 +649,7 @@ class MusicService : Service() {
         @Volatile var trackCount = 0
         @Volatile var modeLive = ""
         @Volatile var alertRemainingMs = 0L
+        // اپ در پیش‌زمینه است؟ (MainActivity در onResume/onPause ست می‌کند)
+        @Volatile var appInForeground = false
     }
 }
