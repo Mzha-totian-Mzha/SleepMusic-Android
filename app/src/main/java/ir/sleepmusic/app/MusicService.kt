@@ -55,6 +55,8 @@ class MusicService : Service() {
     // روش دوم (مستقل از موقعیت MediaPlayer): ساعت واقعی از لحظه شروع پخش
     private var wallStartRealtime = 0L
     private var wallDurMs = 0L
+    // لحظه‌ی توقف موقت پخش — برای اینکه زمان مکث در ساعت واقعی حساب نشود
+    private var pauseWallRealtime = 0L
     // پایان محوشدن بر اساس ساعت واقعی — برای محاسبه حجم
     private var fadeEndRealtime = 0L
     // اعلان هشدار الان روی نوار اعلان است؟ (برای برداشتنش وقتی اپ برگشت پیش‌زمینه)
@@ -156,7 +158,9 @@ class MusicService : Service() {
         } else {
             Long.MAX_VALUE
         }
-        val remainingMs = minOf(remainingPosMs, remainingWallMs)
+        // دو روش مستقل: هر کدام کمتر باشد؛ ولی اگر ساعت واقعی به‌خاطر مکث خراب شد (صفر یا منفی)،
+        // نباید هشدار بُمیرد — همان موقعیت MediaPlayer مبنا می‌شود
+        val remainingMs = if (remainingWallMs in 1..remainingPosMs) remainingWallMs else remainingPosMs
         if (remainingMs in 1..10000) {
             alertSent = true
             startFade(p, remainingMs)
@@ -178,7 +182,7 @@ class MusicService : Service() {
                 if (!fadeRunning || pp == null || pp !== p) return
                 val remainingPos = (pp.duration.toLong() - pp.currentPosition).coerceAtLeast(0)
                 val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
-                val remainingMsNow = minOf(remainingPos, remainingWall)
+                val remainingMsNow = if (remainingWall in 1..remainingPos) remainingWall else remainingPos
                 val vol = (remainingMsNow / 10000f).coerceIn(0.03f, 1f)
                 try { pp.setVolume(vol, vol) } catch (_: Exception) { }
                 if (remainingMsNow > 0) tickHandler.postDelayed(this, 350)
@@ -232,7 +236,7 @@ class MusicService : Service() {
         val p = player ?: return
         val remainingPos = (p.duration.toLong() - p.currentPosition).coerceAtLeast(0)
         val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
-        val remaining = minOf(remainingPos, remainingWall)
+        val remaining = if (remainingWall in 1..remainingPos) remainingWall else remainingPos
         if (remaining <= 0) return
         alertRemainingMs = remaining
         buildAlertNotification(remaining)
@@ -301,9 +305,13 @@ class MusicService : Service() {
                 isPlaying = false
                 isPaused = true
                 tickHandler.removeCallbacks(ticker)
+                // ساعت واقعی هم از لحظه‌ی مکث نگه داشته می‌شود تا زمان مکث در آن حساب نشود
+                pauseWallRealtime = SystemClock.elapsedRealtime()
                 // هشدار ۱۰ ثانیه‌ای هم معطل می‌ماند؛ بعد از ادامه از نو نشان داده می‌شود
                 alertSent = false
                 fadeRunning = false
+                // اگر صدا در حال محوشدن بود، بلندی را برگردان تا بعد از ادامه، موسیقی کامل شنیده شود
+                restoreVolume()
                 cancelAlertNotification()
                 broadcastAlertState("done")
             }
@@ -315,6 +323,11 @@ class MusicService : Service() {
                 try { p.start() } catch (_: Exception) { }
                 isPaused = false
                 isPlaying = true
+                // زمان مکث از ساعت واقعی کم می‌شود تا روش دوم بعد از مکث هم دقیق بماند
+                if (pauseWallRealtime > 0) {
+                    wallStartRealtime += SystemClock.elapsedRealtime() - pauseWallRealtime
+                    pauseWallRealtime = 0L
+                }
                 tickHandler.post(ticker)
             }
             return START_NOT_STICKY
