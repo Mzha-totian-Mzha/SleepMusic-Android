@@ -60,14 +60,15 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * خاموشی واقعی بدون روت — سازگار با منوی دکمه‌ای و منوی کشیدنی (HyperOS):
+     * خاموشی واقعی بدون روت — سازگار با منوی دکمه‌ای و منوی کشیدنی (HyperOS — گوشی کاربر: شیائومی 11T Pro):
      * ۱) اگر صفحه خاموش است، اول بیدارش می‌کنیم
      * ۲) منوی پاور را باز می‌کنیم
-     * ۳) چند بار در فواصل زمانی جستجو می‌کنیم:
+     * ۳) تا ۱۸ ثانیه در فواصل کوتاه جستجو می‌کنیم:
      *    الف) اگر دکمه‌ی واقعی «خاموش کردن» بود → کلیک (نود، والد کلیک‌پذیر، ضربه‌ی لمسی)
-     *    ب) اگر منو کشیدنی بود (آیکون بالا=خاموش، پایین=ری‌استارت) → ژست «کشیدن آیکون به بالا»
+     *    ب) اگر منو کشیدنی بود → ژست «کشیدن آیکون به بالا» با ۵ نقطه‌ی شروع مختلف و کشیدن آرام
+     *       (نقطه‌ی دستگیره‌ی اسلایدر در HyperOS گوشی‌های مختلف فرق دارد؛ باند پهن‌تر = نشستن مطمئن‌تر)
      * ۴) اگر دیالوگ تأیید آمد → روی دکمه‌ی تأیید کلیک می‌کنیم
-     * ۵) اگر تا ۱۱ ثانیه خاموش نشد → حداقل صفحه قفل می‌شود (حالت جایگزین امن)
+     * ۵) اگر تا ۲۰ ثانیه خاموش نشد → حداقل صفحه قفل می‌شود (حالت جایگزین امن)
      */
     fun tryPowerOffViaMenu(): Boolean {
         powerMenuPending = true
@@ -93,13 +94,17 @@ class LockAccessibilityService : AccessibilityService() {
         }, 1000)
 
         // مرحله ۳: جستجوی دوره‌ای — کلیک روی دکمه یا کشیدن آیکون به بالا
-        val scanTimes = longArrayOf(1900, 2700, 3500, 4300, 5100)
+        val scanTimes = longArrayOf(
+            1900, 2700, 3500, 4300, 5100, 5900, 6700, 7500, 8300, 9100, 9900, 10700
+        )
         for (t in scanTimes) {
             handler.postDelayed({ if (powerMenuPending) tryScan() }, t)
         }
 
         // مرحله ۴: جستجوی دیالوگ تأیید (بعد از کلیک/کشیدن)
-        val confirmTimes = longArrayOf(2600, 3400, 4400, 5600, 6800)
+        val confirmTimes = longArrayOf(
+            2600, 3400, 4400, 5600, 6800, 7800, 8800, 9800, 10800, 11800
+        )
         for (t in confirmTimes) {
             handler.postDelayed({ if (powerMenuPending) scanForConfirm() }, t)
         }
@@ -110,10 +115,22 @@ class LockAccessibilityService : AccessibilityService() {
                 powerMenuPending = false
                 performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
             }
-        }, 11000)
+        }, 20000)
 
         return true
     }
+
+    /** drag start point - 5 spots across the middle band; slider handle position differs per ROM */
+    private fun startRatioFor(attempt: Int): Float = when (attempt % 5) {
+        0 -> 0.50f
+        1 -> 0.56f
+        2 -> 0.62f
+        3 -> 0.68f
+        else -> 0.74f
+    }
+
+    /** slower drag = HyperOS slider registers the gesture more reliably */
+    private fun durationFor(attempt: Int): Long = 900L + (attempt % 3) * 150L
 
     private fun tryScan() {
         if (!powerMenuPending) return
@@ -146,17 +163,14 @@ class LockAccessibilityService : AccessibilityService() {
                 }
 
                 // منوی کشیدنی: برچسب «خاموش کردن» معمولاً بالای اسلایدر است؛ از دستگیره تا آنجا می‌کشیم
-                val startRatio = if (attempt % 2 == 0) 0.56f else 0.50f
-                val duration = if (attempt == 4) 900L else 600L
-                dragToPowerOff(rect, startRatio, duration)
+                dragToPowerOff(rect, startRatioFor(attempt), durationFor(attempt))
                 return
             }
         }
 
         // نودی پیدا نشد: روی بعضی رام‌ها اسلایدر هیچ متنی ندارد → ژست عمومی از وسط صفحه به بالا
         if (root != null) {
-            val startRatio = if (attempt % 2 == 0) 0.58f else 0.52f
-            dragToPowerOff(null, startRatio, 700L)
+            dragToPowerOff(null, startRatioFor(attempt), durationFor(attempt))
         } else if (attempt >= 3) {
             // منو باز نشده یا وسط کار بسته شده؛ دوباره بازش می‌کنیم
             performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)

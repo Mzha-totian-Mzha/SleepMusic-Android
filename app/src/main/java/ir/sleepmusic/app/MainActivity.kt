@@ -193,6 +193,11 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= 33) {
             notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+        // یک بار در عمر نصب: اجازه‌ی «نمایش روی سایر برنامه‌ها» برای پاپ‌آپ عکس ۱۰ روی قفل صفحه
+        if (!AlertOverlay.canShow(this) && !prefs.getBoolean("overlay_perm_asked", false)) {
+            prefs.edit().putBoolean("overlay_perm_asked", true).apply()
+            AlertOverlay.askPermission(this)
+        }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
             != PackageManager.PERMISSION_GRANTED
         ) {
@@ -826,8 +831,13 @@ class MainActivity : AppCompatActivity() {
     private fun checkAlertPolling() {
         val arm = MusicService.alertRemainingMs
         val showing = alertDialog != null && alertDialog!!.isShowing
-        if (arm > 0 && !showing) {
-            showAlert(arm.toInt().coerceIn(1, 10000))
+        if (arm > 0 && !showing && !AlertOverlay.isShowing) {
+            if (AlertOverlay.canShow(this)) {
+                // روکش سیستم خودش پاپ‌آپ را نشان می‌دهد؛ دیالوگ داخلی لازم نیست
+                AlertOverlay.show(this, arm)
+            } else {
+                showAlert(arm.toInt().coerceIn(1, 10000))
+            }
         } else if (arm <= 0 && showing) {
             dismissAlert()
         }
@@ -836,6 +846,7 @@ class MainActivity : AppCompatActivity() {
     private fun showAlert(remainingMs: Int) {
         try {
             if (isFinishing || isDestroyed) return
+            if (AlertOverlay.isShowing) return
             if (alertDialog != null && alertDialog!!.isShowing) return
             val dialog = AlertDialog.Builder(this, R.style.Theme_SleepMusic).create()
             dialog.setContentView(R.layout.dialog_alert)

@@ -6,6 +6,8 @@
     <!-- فقط برای تحلیل زنده‌ی موج صدا (رقص نور)؛ هیچ صدایی ضبط یا ذخیره نمی‌شود -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- پاپ‌آپ «عکس ۱۰» به‌صورت روکش سیستم: حتی با اپ بسته و روی قفل صفحه دیده می‌شود -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- هشدار ۱۰ ثانیه‌ای بالای قفل صفحه: اعلان تمام‌صفحه روی صفحه خاموش -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />

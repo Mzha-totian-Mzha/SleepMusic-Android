@@ -204,6 +204,8 @@ class MusicService : Service() {
             alertIntent.putExtra("remaining_ms", remainingMs.toInt())
             alertIntent.putExtra("state", "show")
             sendBroadcast(alertIntent)
+            // پاپ‌آپ «عکس ۱۰» به‌صورت روکش سیستم — حتی با اپ بسته و روی قفل صفحه دیده می‌شود
+            AlertOverlay.show(this, remainingMs)
         }
     }
 
@@ -319,6 +321,8 @@ class MusicService : Service() {
     private fun cancelAlertNotification() {
         alertRemainingMs = 0
         alertNotifActive = false
+        // روکش سیستم پاپ‌آپ هم با هر پاک‌سازی بسته می‌شود (مکث/لغو/پایان/توقف)
+        AlertOverlay.hide()
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         try { manager.cancel(ALERT_NOTIF_ID) } catch (_: Exception) { }
     }
