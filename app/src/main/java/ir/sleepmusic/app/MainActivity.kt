@@ -113,6 +113,7 @@ class MainActivity : AppCompatActivity() {
     private val ticker = object : Runnable {
         override fun run() {
             updatePlaybackUi()
+            checkAlertPolling()
             uiHandler.postDelayed(this, 300)
         }
     }
@@ -816,6 +817,21 @@ class MainActivity : AppCompatActivity() {
     }
 
     /* ================= هشدار ۱۰ ثانیه‌ای ================= */
+
+    /**
+     * پاپ‌آپ هشدار بدون واسطه‌ی برادکست: از عدد زنده‌ی «alertRemainingMs» سرویس تغذیه می‌شود.
+     * تا اگر برادکست روی بعضی رام‌ها گم شد، پاپ‌آپ باز هم از راه برسد؛
+     * و اگر هشدار لغو/تمام شد، خودش بسته می‌شود.
+     */
+    private fun checkAlertPolling() {
+        val arm = MusicService.alertRemainingMs
+        val showing = alertDialog != null && alertDialog!!.isShowing
+        if (arm > 0 && !showing) {
+            showAlert(arm.toInt().coerceIn(1, 10000))
+        } else if (arm <= 0 && showing) {
+            dismissAlert()
+        }
+    }
 
     private fun showAlert(remainingMs: Int) {
         if (isFinishing || isDestroyed) return

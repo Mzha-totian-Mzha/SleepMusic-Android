@@ -163,6 +163,8 @@ class MusicService : Service() {
         val remainingMs = if (remainingWallMs in 1..remainingPosMs) remainingWallMs else remainingPosMs
         if (remainingMs in 1..10000) {
             alertSent = true
+            // عدد زنده‌ی هشدار — صفحه‌ی اصلی بدون نیاز به برادکست از همین عدد پاپ‌آپ را نشان می‌دهد
+            MusicService.alertRemainingMs = remainingMs
             startFade(p, remainingMs)
             val alertIntent = Intent(ALERT_ACTION).setPackage(packageName)
             alertIntent.putExtra("remaining_ms", remainingMs.toInt())
@@ -223,26 +225,26 @@ class MusicService : Service() {
     }
 
     /**
-     * هر نیم ثانیه چک می‌شود:
-     *   اپ جلوی چشم است  → پاپ‌آپ درون برنامه کار می‌کند؛ اعلان را بردار (برگشت از پس‌زمینه)
-     *   اپ در پس‌زمینه است → اعلان قفل صفحه با شمارش معکوس زنده نشان بده
+     * هر نیم ثانیه چک می‌شود — عیناً مثل نسخه‌ی ۱.۶ که روی دستگاه واقعی کار می‌کرد:
+     *   - عدد زنده‌ی هشدار در alertRemainingMs به‌روز می‌شود (تغذیه‌ی پاپ‌آپ صفحه‌ی اصلی)
+     *   - اعلان قفل صفحه همیشه ساخته و تازه می‌شود؛ دیگر به پیش‌زمینه بودن اپ ربطی ندارد
+     *     (در ۱.۷ اعلان فقط برای پس‌زمینه بود و اگر برادکست پاپ‌آپ گم می‌شد، هیچ‌چیز نمی‌آمد)
      */
     private fun handleAlertUi() {
         if (!alertSent || shutdownCancelled) return
-        if (appInForeground) {
-            if (alertNotifActive) cancelAlertNotification()
-            return
-        }
         val p = player ?: return
         val remainingPos = (p.duration.toLong() - p.currentPosition).coerceAtLeast(0)
         val remainingWall = (fadeEndRealtime - SystemClock.elapsedRealtime()).coerceAtLeast(0)
         val remaining = if (remainingWall in 1..remainingPos) remainingWall else remainingPos
-        if (remaining <= 0) return
-        alertRemainingMs = remaining
+        if (remaining <= 0) {
+            MusicService.alertRemainingMs = 0L
+            return
+        }
+        MusicService.alertRemainingMs = remaining
         buildAlertNotification(remaining)
     }
 
-    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» — فقط برای وقتی اپ در پیش‌زمینه نیست */
+    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» — همیشه نشان داده می‌شود */
     private fun buildAlertNotification(remainingMs: Long) {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val secs = ((remainingMs + 999) / 1000).toInt()
@@ -309,6 +311,7 @@ class MusicService : Service() {
                 pauseWallRealtime = SystemClock.elapsedRealtime()
                 // هشدار ۱۰ ثانیه‌ای هم معطل می‌ماند؛ بعد از ادامه از نو نشان داده می‌شود
                 alertSent = false
+                MusicService.alertRemainingMs = 0L
                 fadeRunning = false
                 // اگر صدا در حال محوشدن بود، بلندی را برگردان تا بعد از ادامه، موسیقی کامل شنیده شود
                 restoreVolume()
@@ -366,6 +369,7 @@ class MusicService : Service() {
         mode = intent?.getStringExtra(EXTRA_MODE) ?: MODE_SINGLE
         shutdownCancelled = false
         alertSent = false
+        MusicService.alertRemainingMs = 0L
         fadeRunning = false
         retryCount = 0
 
