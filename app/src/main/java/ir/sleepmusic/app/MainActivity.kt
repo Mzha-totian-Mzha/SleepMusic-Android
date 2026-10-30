@@ -834,47 +834,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showAlert(remainingMs: Int) {
-        if (isFinishing || isDestroyed) return
-        if (alertDialog != null && alertDialog!!.isShowing) return
-        val dialog = AlertDialog.Builder(this, R.style.Theme_SleepMusic).create()
-        dialog.setContentView(R.layout.dialog_alert)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        dialog.window?.setLayout(
-            (resources.displayMetrics.widthPixels * 0.86f).toInt(),
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-        dialog.findViewById<LinearLayout>(R.id.dlgAlertRoot)!!.background = roundRectStroke(theme.cardBg, dp(22f))
-        dialog.findViewById<TextView>(R.id.dlgAlertTitle)!!.setTextColor(theme.textPrimary)
-        dialog.findViewById<TextView>(R.id.dlgAlertSub)!!.setTextColor(theme.textMuted)
-        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.background = gradient(theme.btnColors, dp(14f), dp(2f).toInt(), borderColor())
-        dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setTextColor(theme.textMuted)
-        val bar = dialog.findViewById<View>(R.id.alertBar)
-        alertBar = bar
-        bar?.scaleX = 1f
-        bar?.pivotX = 0f
-        alertAnimator?.cancel()
-        alertAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
-            duration = remainingMs.toLong().coerceAtLeast(1000L)
-            addUpdateListener { animator ->
-                bar?.scaleX = animator.animatedValue as Float
-            }
-        }
-        alertAnimator?.start()
-
-        dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.setOnClickListener {
-            dismissAlert()
-            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_CANCEL_SHUTDOWN))
-        }
-        dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setOnClickListener {
-            dismissAlert()
-            startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_SHUTDOWN_NOW))
-        }
-        dialog.setOnDismissListener {
+        try {
+            if (isFinishing || isDestroyed) return
+            if (alertDialog != null && alertDialog!!.isShowing) return
+            val dialog = AlertDialog.Builder(this, R.style.Theme_SleepMusic).create()
+            dialog.setContentView(R.layout.dialog_alert)
+            dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+            dialog.window?.setLayout(
+                (resources.displayMetrics.widthPixels * 0.86f).toInt(),
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+            dialog.findViewById<LinearLayout>(R.id.dlgAlertRoot)!!.background = roundRectStroke(theme.cardBg, dp(22f))
+            dialog.findViewById<TextView>(R.id.dlgAlertTitle)!!.setTextColor(theme.textPrimary)
+            dialog.findViewById<TextView>(R.id.dlgAlertSub)!!.setTextColor(theme.textMuted)
+            dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.background = gradient(theme.btnColors, dp(14f), dp(2f).toInt(), borderColor())
+            dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setTextColor(theme.textMuted)
+            val bar = dialog.findViewById<View>(R.id.alertBar)
+            alertBar = bar
+            bar?.scaleX = 1f
+            bar?.pivotX = 0f
             alertAnimator?.cancel()
-            alertAnimator = null
+            alertAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
+                duration = remainingMs.toLong().coerceAtLeast(1000L)
+                addUpdateListener { animator ->
+                    bar?.scaleX = animator.animatedValue as Float
+                }
+            }
+            alertAnimator?.start()
+
+            dialog.findViewById<TextView>(R.id.btnAlertCancel)!!.setOnClickListener {
+                dismissAlert()
+                startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_CANCEL_SHUTDOWN))
+            }
+            dialog.findViewById<TextView>(R.id.btnAlertNow)!!.setOnClickListener {
+                dismissAlert()
+                startService(Intent(this, MusicService::class.java).setAction(MusicService.ACTION_SHUTDOWN_NOW))
+            }
+            dialog.setOnDismissListener {
+                alertAnimator?.cancel()
+                alertAnimator = null
+            }
+            alertDialog = dialog
+            dialog.show()
+        } catch (_: Exception) {
+            // اگر دیالوگ به هر دلیلی باز نشد، دست خالی نمی‌مانیم — پیام شناور همیشه کار می‌کند
+            alertDialog = null
+            try {
+                Toast.makeText(this, "۱۰ ثانیه تا خاموشی گوشی!", Toast.LENGTH_LONG).show()
+            } catch (_: Exception) { }
         }
-        alertDialog = dialog
-        dialog.show()
     }
 
     private fun dismissAlert() {

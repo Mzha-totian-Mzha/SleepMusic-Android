@@ -81,15 +81,36 @@ class MusicService : Service() {
 
     // هر نیم ثانیه موقعیت پخش را به‌روزرسانی می‌کند تا رقص نور اپ زنده بماند
     // و در ۱۰ ثانیه‌ی آخر، هشدار و محو شدن صدا فعال شود
+    // کل بدنه در try/catch است تا هیچ خطایی هرگز تیکر را نکشد (علت احتمالی مرگ هشدار)
     private val ticker = object : Runnable {
         override fun run() {
             val p = player
             if (p != null && isPlaying) {
-                positionSec = p.currentPosition / 1000
-                updateRemaining()
-                maybeStartAlertAndFade()
-                handleAlertUi()
+                try {
+                    positionSec = p.currentPosition / 1000
+                    updateRemaining()
+                    tryFireAlert()
+                    handleAlertUi()
+                } catch (_: Exception) { }
                 tickHandler.postDelayed(this, 500)
+            }
+        }
+    }
+
+    /**
+     * نگهبان مستقل هشدار — هر ۱.۵ ثانیه، جدا از تیکر:
+     * حتی اگر تیکر به هر دلیلی مرده باشد، این خودش هشدار را شلیک می‌کند.
+     * چون هر بار وضعیت را تازه می‌خواند، مکث/کشیدن نوار هم لازم به جبران ندارد.
+     */
+    private val alertWatchdog = object : Runnable {
+        override fun run() {
+            try {
+                if (!alertSent && !shutdownCancelled && player != null && isPlaying) {
+                    tryFireAlert()
+                }
+            } catch (_: Exception) { }
+            if (!alertSent && !shutdownCancelled && player != null) {
+                tickHandler.postDelayed(this, 1500)
             }
         }
     }
@@ -146,6 +167,19 @@ class MusicService : Service() {
      *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
      */
     private fun maybeStartAlertAndFade() {
+        tryFireAlert()
+    }
+
+    /**
+     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
+     * هم تیکر و هم نگهبان مستقل این تابع را صدا می‌زنند؛ سپر alertSent جلوی دوباره‌کاری را می‌گیرد.
+     * پاپ‌آپ درون برنامه (همان تصویر تأییدشده) با برادکست + خواندن عدد زنده نشان داده می‌شود؛
+     * اعلان قفل صفحه هم همیشه ساخته می‌شود (مثل ۱.۶ که روی دستگاه کاربر کار می‌کرد).
+     * دو روش مستقل با هم چک می‌شوند تا حتی اگر mp3 طول را اشتباه گفت، باز هم فعال شود:
+     *   ۱) موقعیت MediaPlayer نسبت به duration
+     *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
+     */
+    private fun tryFireAlert() {
         val p = player ?: return
         if (alertSent || shutdownCancelled) return
         val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
@@ -452,6 +486,9 @@ class MusicService : Service() {
                 wallDurMs = prepared.duration.toLong()
                 updateRemaining()
                 tickHandler.post(ticker)
+                // نگهبان مستقل هشدار — جدا از تیکر، تا حتی اگر تیکر مرد، هشدار از راه برسد
+                tickHandler.removeCallbacks(alertWatchdog)
+                tickHandler.postDelayed(alertWatchdog, 2000)
             }
             mp.setOnCompletionListener {
                 // در پلی‌لیست: آهنگ بعدی؛ بعد از آخرین آهنگ: خاموشی همیشگی
@@ -462,6 +499,11 @@ class MusicService : Service() {
                 } else {
                     if (!shutdownCancelled) {
                         recordNightSuccess()
+                        // قبل از زنجیره‌ی خاموشی، همه‌ی پوشش‌های خودمان را برمی‌داریم تا جلوی
+                        // منوی خاموشی سیستم چیزی نگیرد (پاپ‌آپ/اعلان نباید مانع کلیک سرویس دسترس‌پذیری شود)
+                        MusicService.alertRemainingMs = 0L
+                        cancelAlertNotification()
+                        broadcastAlertState("done")
                         val prefs = getSharedPreferences("sleep_music", Context.MODE_PRIVATE)
                         // زنجیره‌ی خاموشی واقعی — عیناً مثل نسخه‌هایی که تست شده
                         ActionExecutor.execute(this@MusicService, prefs.getBoolean("power_menu", true))
@@ -607,6 +649,7 @@ class MusicService : Service() {
         isPaused = false
         fadeRunning = false
         tickHandler.removeCallbacks(ticker)
+        tickHandler.removeCallbacks(alertWatchdog)
         abandonAudioFocus()
         player?.run {
             try { stop() } catch (_: Exception) { }
@@ -626,6 +669,7 @@ class MusicService : Service() {
         isPaused = false
         fadeRunning = false
         tickHandler.removeCallbacks(ticker)
+        tickHandler.removeCallbacks(alertWatchdog)
         abandonAudioFocus()
         player?.run {
             try { stop() } catch (_: Exception) { }
