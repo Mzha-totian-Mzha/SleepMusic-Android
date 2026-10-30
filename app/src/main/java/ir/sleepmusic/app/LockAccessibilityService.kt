@@ -27,6 +27,13 @@ class LockAccessibilityService : AccessibilityService() {
             "إيقاف التشغيل", "ايقاف التشغيل", "关机"
         )
 
+        // برچسب «ری‌استارت» — دستگیره‌ی خاموشی معمولاً دقیقاً بالای آن است؛
+        // همچنین وجود آن یعنی «منوی اصلی» جلوی ماست نه دیالوگ تأیید
+        private val RESTART_KEYWORDS = listOf(
+            "ری‌استارت", "ری استارت", "ري‌استارت", "شروع مجدد", "راه‌اندازی مجدد", "راه اندازی مجدد",
+            "restart", "reboot", "إعادة التشغيل", "重启"
+        )
+
         // کلیدواژه‌های دیالوگ تأیید (بعضی رام‌ها بعد از خاموشی، تأیید می‌خواهند)
         private val CONFIRM_KEYWORDS = listOf(
             "خاموش کردن", "power off", "shut down", "turn off",
@@ -37,6 +44,17 @@ class LockAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
     private var lastAttemptAt = 0L
     private var scanCount = 0
+    private var reOpenCount = 0
+
+    // ⚠️ نکته‌ی حیاتی (ریشه‌ی ایراد نسخه‌های قبل):
+    // سرویس دسترس‌پذیری در هر لحظه فقط «یک» ژست را اجرا می‌کند؛ dispatchGesture بعدی،
+    // ژستِ در حال اجرا را «لغو» می‌کند. قبلاً فواصلِ تلاش‌ها (۸۰۰ms) از مدتِ کشیدن
+    // (۹۰۰ تا ۱۲۰۰ms) کمتر بود؛ یعنی هر کشیدن وسط راه با تلاش بعدی لغو می‌شد و
+    // اسلایدر HyperOS هرگز تا ناحیه‌ی رهاسازی کامل نمی‌شد. حالا هر ژست تا پایانِ کامل
+    // اجرا می‌شود و فقط بعد از آن ژست بعدی شروع می‌شود.
+    @Volatile
+    private var gestureBusy = false
+    private var gestureStartedAt = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -48,13 +66,16 @@ class LockAccessibilityService : AccessibilityService() {
         // به‌محض باز شدن پنجره‌ی منوی پاور (SystemUI) تلاش زودهنگام می‌کنیم
         if (event?.packageName?.toString() != "com.android.systemui") return
         val now = SystemClock.elapsedRealtime()
-        if (now - lastAttemptAt < 800) return
+        if (gestureBusy || now - lastAttemptAt < 1000) return
         tryScan()
     }
 
     override fun onInterrupt() { }
 
     override fun onDestroy() {
+        powerMenuPending = false
+        gestureBusy = false
+        handler.removeCallbacksAndMessages(null)
         instance = null
         super.onDestroy()
     }
@@ -63,17 +84,22 @@ class LockAccessibilityService : AccessibilityService() {
      * خاموشی واقعی بدون روت — سازگار با منوی دکمه‌ای و منوی کشیدنی (HyperOS — گوشی کاربر: شیائومی 11T Pro):
      * ۱) اگر صفحه خاموش است، اول بیدارش می‌کنیم
      * ۲) منوی پاور را باز می‌کنیم
-     * ۳) تا ۱۸ ثانیه در فواصل کوتاه جستجو می‌کنیم:
-     *    الف) اگر دکمه‌ی واقعی «خاموش کردن» بود → کلیک (نود، والد کلیک‌پذیر، ضربه‌ی لمسی)
-     *    ب) اگر منو کشیدنی بود → ژست «کشیدن آیکون به بالا» با ۵ نقطه‌ی شروع مختلف و کشیدن آرام
-     *       (نقطه‌ی دستگیره‌ی اسلایدر در HyperOS گوشی‌های مختلف فرق دارد؛ باند پهن‌تر = نشستن مطمئن‌تر)
-     * ۴) اگر دیالوگ تأیید آمد → روی دکمه‌ی تأیید کلیک می‌کنیم
+     * ۳) با تیکِ دوره‌ای جستجو می‌کنیم — هر تلاش فقط وقتی شروع می‌شود که ژستِ قبلی «کامل» شده باشد:
+     *    الف) اگر برچسب «خاموش کردن» پیدا شد → نوبت اول فقط کلیک (منوی دکمه‌ای)؛ بعد از آن
+     *       ژست «کشیدن به بالا» که نقطه‌ی شروعش از روی محل واقعی همان برچسب لنگر می‌شود
+     *       (۴ حالت مختلف: روی متن، زیر متن، کمی پایین‌تر، بالای متن)
+     *    ب) اگر فقط برچسب «ری‌استارت» پیدا شد → دستگیره‌ی خاموشی معمولاً بالای آن است
+     *    ج) اگر هیچ متنی نبود → جاروی عمودی متراکم از نقاط مختلف نوار میانی
+     *    همه‌ی کشیدن‌ها فقط «به بالا» هستند تا هرگز باعث ری‌استارت (کشیدن به پایین) نشوند
+     * ۴) اگر دیالوگ تأیید جداگانه آمد (منویی که ری‌استارت ندارد) → روی دکمه‌ی تأیید کلیک می‌کنیم
      * ۵) اگر تا ۲۰ ثانیه خاموش نشد → حداقل صفحه قفل می‌شود (حالت جایگزین امن)
      */
     fun tryPowerOffViaMenu(): Boolean {
         powerMenuPending = true
         lastAttemptAt = 0
         scanCount = 0
+        reOpenCount = 0
+        gestureBusy = false
 
         // مرحله ۱: بیدار کردن صفحه
         try {
@@ -89,21 +115,17 @@ class LockAccessibilityService : AccessibilityService() {
         } catch (_: Exception) { }
 
         // مرحله ۲: باز کردن منوی پاور (کمی صبر برای روشن شدن صفحه)
+        handler.removeCallbacks(scanTick)
         handler.postDelayed({
             if (powerMenuPending) performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
         }, 1000)
 
-        // مرحله ۳: جستجوی دوره‌ای — کلیک روی دکمه یا کشیدن آیکون به بالا
-        val scanTimes = longArrayOf(
-            1900, 2700, 3500, 4300, 5100, 5900, 6700, 7500, 8300, 9100, 9900, 10700
-        )
-        for (t in scanTimes) {
-            handler.postDelayed({ if (powerMenuPending) tryScan() }, t)
-        }
+        // مرحله ۳: تیکِ دوره‌ای — هر دور فقط بعد از پایانِ کاملِ ژستِ قبلی
+        handler.postDelayed(scanTick, 2100)
 
-        // مرحله ۴: جستجوی دیالوگ تأیید (بعد از کلیک/کشیدن)
+        // مرحله ۴: جستجوی دیالوگ تأیید (بعد از کلیک موفق در منوهای دکمه‌ای)
         val confirmTimes = longArrayOf(
-            2600, 3400, 4400, 5600, 6800, 7800, 8800, 9800, 10800, 11800
+            2600, 3600, 4600, 5600, 6600, 7600, 8600, 9600, 10600, 11600, 13000, 15000
         )
         for (t in confirmTimes) {
             handler.postDelayed({ if (powerMenuPending) scanForConfirm() }, t)
@@ -113,6 +135,7 @@ class LockAccessibilityService : AccessibilityService() {
         handler.postDelayed({
             if (powerMenuPending) {
                 powerMenuPending = false
+                handler.removeCallbacks(scanTick)
                 performGlobalAction(GLOBAL_ACTION_LOCK_SCREEN)
             }
         }, 20000)
@@ -120,115 +143,179 @@ class LockAccessibilityService : AccessibilityService() {
         return true
     }
 
-    /** drag start point - 5 spots across the middle band; slider handle position differs per ROM */
-    private fun startRatioFor(attempt: Int): Float = when (attempt % 5) {
-        0 -> 0.50f
-        1 -> 0.56f
-        2 -> 0.62f
-        3 -> 0.68f
-        else -> 0.74f
+    /** تیک دوره‌ای: دور جدید فقط وقتی که دست خالی است؛ اگر کال‌بکِ پایان ژست گم شده بود، بعد از ۲.۵ ثانیه دست را آزاد می‌کنیم */
+    private val scanTick = object : Runnable {
+        override fun run() {
+            if (!powerMenuPending) return
+            if (gestureBusy && SystemClock.elapsedRealtime() - gestureStartedAt > 2500) {
+                gestureBusy = false
+            }
+            if (!gestureBusy) tryScan()
+            handler.postDelayed(this, 1100)
+        }
     }
 
-    /** slower drag = HyperOS slider registers the gesture more reliably */
-    private fun durationFor(attempt: Int): Long = 900L + (attempt % 3) * 150L
-
     private fun tryScan() {
-        if (!powerMenuPending) return
+        if (!powerMenuPending || gestureBusy) return
         lastAttemptAt = SystemClock.elapsedRealtime()
         val attempt = scanCount
         scanCount++
         scanAndAct(attempt)
     }
 
-    /** یک دور جستجو: اول دکمه‌ی خاموشی، اگر نبود (یا نوبت کشیدن بود) ژست «کشیدن به بالا» */
+    /** یک دور جستجو: اول برچسب خاموش، بعد برچسب ری‌استارت، و اگر هیچ‌کدام نبود جاروی عمودی */
     private fun scanAndAct(attempt: Int) {
         if (!powerMenuPending) return
         val root = findSystemUiRoot()
 
-        if (root != null) {
-            try { root.refresh() } catch (_: Exception) { }
-
-            val node = findNodeByKeywords(root, POWER_OFF_KEYWORDS)
-            if (node != null) {
-                val rect = Rect()
-                node.getBoundsInScreen(rect)
-
-                // منوی دکمه‌ای: کلیک استاندارد (نوبت ۲ و ۴ فقط مخصوص کشیدن است)
-                if (attempt != 2 && attempt != 4) {
-                    val clickable = findClickableSelfOrAncestor(node)
-                    if (clickable != null) {
-                        if (clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return
-                        if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60)) return
-                    }
-                }
-
-                // منوی کشیدنی: برچسب «خاموش کردن» معمولاً بالای اسلایدر است؛ از دستگیره تا آنجا می‌کشیم
-                dragToPowerOff(rect, startRatioFor(attempt), durationFor(attempt))
-                return
+        if (root == null) {
+            // منو بسته شده (یا هنوز باز نشده) — حداکثر ۳ بار دوباره بازش می‌کنیم؛
+            // بیشتر از این نه، چون شاید گوشی همین الان در حال خاموش شدن باشد
+            if (attempt >= 2 && reOpenCount < 3) {
+                reOpenCount++
+                performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
             }
+            return
+        }
+        try { root.refresh() } catch (_: Exception) { }
+
+        val powerNode = findNodeByKeywords(root, POWER_OFF_KEYWORDS)
+        if (powerNode != null) {
+            val rect = Rect()
+            powerNode.getBoundsInScreen(rect)
+
+            // فقط نوبتِ اول: کلیکِ استاندارد (برای منوهای دکمه‌ای قدیمی)
+            if (attempt == 0) {
+                val clickable = findClickableSelfOrAncestor(powerNode)
+                if (clickable != null) {
+                    if (clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return
+                    if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 70)) return
+                }
+            }
+
+            // منوی کشیدنی: کشیدنِ لنگرشده به محل واقعی برچسب/دستگیره
+            dragAnchoredToLabel(rect, attempt)
+            return
         }
 
-        // نودی پیدا نشد: روی بعضی رام‌ها اسلایدر هیچ متنی ندارد → ژست عمومی از وسط صفحه به بالا
-        if (root != null) {
-            dragToPowerOff(null, startRatioFor(attempt), durationFor(attempt))
-        } else if (attempt >= 3) {
-            // منو باز نشده یا وسط کار بسته شده؛ دوباره بازش می‌کنیم
-            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+        val restartNode = findNodeByKeywords(root, RESTART_KEYWORDS)
+        if (restartNode != null) {
+            val r = Rect()
+            restartNode.getBoundsInScreen(r)
+            // دستگیره‌ی خاموشی معمولاً دقیقاً بالای برچسب ری‌استارت است
+            val h = resources.displayMetrics.heightPixels
+            val cx = r.exactCenterX()
+            val sy = (r.top - 150f).coerceAtLeast(200f)
+            dragFromTo(cx, sy, cx, (h * 0.15f).coerceAtLeast(80f), 950L)
+            return
+        }
+
+        // نودی پیدا نشد: روی بعضی رام‌ها اسلایدر هیچ متنی ندارد → جاروی عمودی متراکم
+        genericSweepDrag(attempt)
+    }
+
+    /**
+     * کشیدنِ لنگرشده: نقطه‌ی شروع از روی محل واقعی برچسب «خاموش کردن» انتخاب می‌شود،
+     * نه از نقاط حدسی. ۴ حالت پوشش داده می‌شود تا هر جا که متن باشد (روی دستگیره،
+     * زیر دستگیره یا بالای آن) شروعِ کشیدن روی دستگیره بنشیند.
+     * پایان‌ها هم متنوع‌اند (۱۲ تا ۲۰ درصد ارتفاع) چون محل دقیق ناحیه‌ی رهاسازی از رام to رام فرق دارد.
+     * همه فقط به سمت بالا — تا هیچ‌وقت ری‌استارت (کشیدن به پایین) فعال نشود.
+     */
+    private fun dragAnchoredToLabel(label: Rect, attempt: Int) {
+        val h = resources.displayMetrics.heightPixels
+        if (h <= 0) return
+        val cx = label.exactCenterX()
+        when (attempt % 4) {
+            0 -> dragFromTo(cx, label.bottom + 90f, cx, (h * 0.20f).coerceAtLeast(80f), 950L)
+            1 -> dragFromTo(cx, label.exactCenterY(), cx, (h * 0.12f).coerceAtLeast(80f), 1100L)
+            2 -> dragFromTo(cx, label.exactCenterY() + 220f, cx, (label.top - 500f).coerceAtLeast(80f), 1000L)
+            else -> dragFromTo(cx, label.top - 60f, cx, (h * 0.16f).coerceAtLeast(80f), 1000L)
         }
     }
 
-    /** جستجوی دیالوگ تأیید: فقط دکمه‌ی کلیک‌پذیرِ «خاموش کردن/تأیید» را کلیک می‌کنیم */
-    private fun scanForConfirm() {
+    /** جاروی عمودی: شروع از نقاط مختلف نوار میانی (۰.۴۲ تا ۰.۷۰ ارتفاع) تا نزدیک بالای صفحه */
+    private fun genericSweepDrag(attempt: Int) {
+        val w = resources.displayMetrics.widthPixels
+        val h = resources.displayMetrics.heightPixels
+        if (w <= 0 || h <= 0) return
+        val ratios = floatArrayOf(0.42f, 0.50f, 0.58f, 0.66f, 0.46f, 0.54f, 0.62f, 0.70f)
+        val sy = h * ratios[attempt % ratios.size]
+        dragFromTo(w * 0.5f, sy, w * 0.5f, (h * 0.12f).coerceAtLeast(80f), 950L)
+    }
+
+    /**
+     * اجرای محافظت‌شده‌ی ژست: تا ژستِ قبلی «کامل» نشده، ژست جدیدی فرستاده نمی‌شود.
+     * پایان ژست (موفق یا لغوشده) دور بعد را ۳۰۰ms بعد شروع می‌کند — سریع‌تر از تیکِ اصلی، ولی بدون هم‌پوشانی.
+     */
+    private fun dragFromTo(sx: Float, sy: Float, ex: Float, ey: Float, durationMs: Long): Boolean {
+        return try {
+            val w = resources.displayMetrics.widthPixels
+            val h = resources.displayMetrics.heightPixels
+            if (w <= 0 || h <= 0) return false
+
+            val x1 = sx.coerceIn(0f, w.toFloat())
+            val y1 = sy.coerceIn(0f, h.toFloat())
+            val x2 = ex.coerceIn(0f, w.toFloat())
+            val y2 = ey.coerceIn(0f, h.toFloat())
+
+            val path = Path()
+            path.moveTo(x1, y1)
+            path.lineTo(x2, y2)
+
+            val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
+            val gesture = GestureDescription.Builder().addStroke(stroke).build()
+
+            gestureBusy = true
+            gestureStartedAt = SystemClock.elapsedRealtime()
+            val ok = dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+                override fun onCompleted(gestureDescription: GestureDescription?) {
+                    gestureBusy = false
+                    scheduleNextScan(300)
+                }
+
+                override fun onCancelled(gestureDescription: GestureDescription?) {
+                    gestureBusy = false
+                    scheduleNextScan(300)
+                }
+            }, null)
+            if (!ok) gestureBusy = false
+            ok
+        } catch (_: Exception) {
+            gestureBusy = false
+            false
+        }
+    }
+
+    /** بعد از تمام‌شدن یک ژست، دور بعد را زودتر از تیکِ اصلی شروع کن (بدون هم‌پوشانی) */
+    private fun scheduleNextScan(delayMs: Long) {
         if (!powerMenuPending) return
+        handler.removeCallbacks(scanTick)
+        handler.postDelayed(scanTick, delayMs)
+    }
+
+    /**
+     * جستجوی دیالوگ تأیید: فقط وقتی «دیالوگ تأییدِ واقعی» جلوی ماست کلیک می‌کنیم.
+     * تشخیص: اگر برچسب «ری‌استارت» هم همان‌جا باشد یعنی این منوی اصلی است —
+     * قبلاً همین‌جا اشتباه می‌شد و کلیک روی خودِ منوی اصلی، کل عملیات را رها می‌کرد.
+     */
+    private fun scanForConfirm() {
+        if (!powerMenuPending || gestureBusy) return
         val root = findSystemUiRoot() ?: return
         try { root.refresh() } catch (_: Exception) { }
 
+        if (findNodeByKeywords(root, RESTART_KEYWORDS) != null) return
         val node = findNodeByKeywords(root, CONFIRM_KEYWORDS) ?: return
         val clickable = findClickableSelfOrAncestor(node) ?: return
         if (clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
             powerMenuPending = false
+            handler.removeCallbacks(scanTick)
             return
         }
         val rect = Rect()
         node.getBoundsInScreen(rect)
         if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60)) {
             powerMenuPending = false
-        }
-    }
-
-    /**
-     * ژست «کشیدن به بالا» برای منوی کشیدنی HyperOS:
-     * از محل دستگیره (وسط صفحه) به سمت برچسب «خاموش کردن» (بالای صفحه) می‌کشیم.
-     * targetLabel = محل برچسب؛ اگر null باشد به بالای صفحه می‌کشیم.
-     * فقط به سمت بالا می‌کشیم تا هیچ‌وقت باعث «ری‌استارت» (کشیدن به پایین) نشود.
-     */
-    private fun dragToPowerOff(targetLabel: Rect?, startRatio: Float, durationMs: Long): Boolean {
-        return try {
-            val w = resources.displayMetrics.widthPixels
-            val h = resources.displayMetrics.heightPixels
-            if (w <= 0 || h <= 0) return false
-
-            val startX = w * 0.5f
-            val startY = h * startRatio
-            val endX: Float
-            val endY: Float
-            if (targetLabel != null && !targetLabel.isEmpty && targetLabel.centerY() < h * 0.40f) {
-                endX = targetLabel.exactCenterX()
-                endY = targetLabel.exactCenterY()
-            } else {
-                endX = w * 0.5f
-                endY = h * 0.08f
-            }
-
-            val path = Path()
-            path.moveTo(startX, startY)
-            path.lineTo(endX, endY)
-
-            val stroke = GestureDescription.StrokeDescription(path, 0L, durationMs)
-            val gesture = GestureDescription.Builder().addStroke(stroke).build()
-            dispatchGesture(gesture, null, null)
-        } catch (_: Exception) {
-            false
+            handler.removeCallbacks(scanTick)
         }
     }
 
