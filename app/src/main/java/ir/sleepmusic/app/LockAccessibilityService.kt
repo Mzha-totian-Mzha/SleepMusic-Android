@@ -12,23 +12,22 @@ import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
 /**
- * خاموشی واقعی بدون روت — نسخه‌ی «حرکتِ کور روی منوی ناخوانا» (v1.13):
+ * خاموشی واقعی بدون روت — v1.14 «شناسایی منو با محتوا + اسلایدر»:
  *
- * درسی که از گزارش واقعی گوشی کاربر (شیائومی 11T Pro) گرفتیم:
- *  ۱) منوی خاموشی HyperOS پنجره‌اش را به سرویس دسترس‌پذیری «نشان نمی‌دهد» — بعد از
- *     باز شدن منو، حتی نوار وضعیت هم از لیست پنجره‌ها حذف می‌شود و همه‌چیز NULL است.
- *     نسخه‌های قبلی در این حالت اشتباهاً هیچ حرکتی نمی‌زدند!
- *  ۲) نوارِ وضعیتِ معمولی خودش پنجره‌ی com.android.systemui دارد؛ اگر پنجره‌ی
- *     systemui را بدون چکِ اندازه بپذیریم، به‌جای منو درخت ساعت/باتری را می‌خوانیم
- *     و حرکات اول قبل از باز شدن منو هدر می‌رود.
- *  ۳) پس حرکت‌ها باید «کور» باشند: بعد از باز شدن منو، روی مختصات واقعیِ ناحیه‌ی
- *     آیکون خاموشی (ستون میانی، نوار ۰.۳۴ تا ۰.۵۰ ارتفاع) همه‌ی سبک‌های تعامل
- *     (ضربه، نگه‌داشتن، کشیدن به بالا، نگه‌دار-وبکش، کشیدن افقی چپ) تزریق شود —
- *     بدون هیچ وابستگی به دیدنِ پنجره‌ی منو. ژست‌ها در سطح سیستم تزریق می‌شوند و
- *     روی پنجره‌های ناخوانا هم کار می‌کنند.
- *
- * اگر رامی منو را خوانا نشان دهد (بعضی رام‌ها)، از نودِ واقعی هم استفاده می‌کنیم.
- * همه‌ی کشیدن‌ها فقط به بالا/چپ‌اند تا هرگز ری‌استارت نشود؛ حالت امن قفل صفحه سر جایش است.
+ * درس‌های گزارش واقعی 11T Pro و نسخه‌ای که روی همان گوشی جواب داد:
+ *  ۱) منوی خاموشی HyperOS پنجره‌اش را در پکیج «miui.systemui.plugin» می‌سازد؛
+ *     فیلتر قدیمیِ «فقط com.android.systemui» چهار نسخه (v1.10..v1.13) باعث می‌شد
+ *     برنامه منو را اصلاً نبیند. حالا منو با «محتوایش» شناسایی می‌شود: هر پنجره‌ای
+ *     که درختش برچسبِ خاموش‌کردن یا ری‌استارت دارد همان منوست — فارغ از پکیج.
+ *     پنجره‌های خودِ برنامه و لانچر رد می‌شوند؛ پنجره‌ی بزرگِ systemui فقط پشتیبان است.
+ *  ۲) کنترل واقعیِ خاموشی در HyperOS «اسلایدر» است («slide to power off» / «به بالا»)
+ *     نه دکمه‌ای که با کلیکِ متنِ «خاموش کردن» کار کند — ACTION_CLICK روی متن
+ *     ret=true می‌داد ولی هیچ‌کاری نمی‌کرد (اشکال پنهان v1.13 که شکست را شبیه
+ *     موفقیت نشان می‌داد). پس اولویتِ اول: پیدا کردن نودِ اسلایدر و کشیدنِ واقعی
+ *     روی مستطیلِ خودش (۸ اسلات، همیشه به بالا تا هرگز ری‌استارت نشود).
+ *  ۳) بعد از اسلایدر: کلیک/نگه‌داشتن/کشیدنِ لنگرشده روی نودِ واقعی «خاموش کردن»،
+ *     لنگرِ ری‌استارت، و در نهایت حرکتِ کور. هر لحظه فقط یک ژست در جریان است.
+ *  ۴) اگر تا ۲۵ ثانیه نشد → حالت امن: قفل صفحه (بدون تغییر نسبت به نسخه‌های قبل).
  */
 class LockAccessibilityService : AccessibilityService() {
 
@@ -46,7 +45,13 @@ class LockAccessibilityService : AccessibilityService() {
 
         private val RESTART_KEYWORDS = listOf(
             "ری‌استارت", "ری استارت", "ري‌استارت", "شروع مجدد", "راه‌اندازی مجدد", "راه اندازی مجدد",
+            "راه‌اندازی دوباره", "راه اندازی دوباره",
             "restart", "reboot", "إعادة التشغيل", "重启"
+        )
+
+        /** کنترل واقعی خاموشی در HyperOS: اسلایدرِ «به بالا بکش» */
+        private val SLIDER_KEYWORDS = listOf(
+            "به بالا", "swipe up", "slide up", "slide to power", "slide to"
         )
 
         private val CONFIRM_KEYWORDS = listOf(
@@ -60,14 +65,13 @@ class LockAccessibilityService : AccessibilityService() {
     private var attemptNo = 0
     private var reOpenCount = 0
     private var dumpedTree = false
-    private var dumpedWindows = false
-    private var statusBarSkips = 0
     private var sessionStart = 0L
+    private var menuSeen = false
+    private var menuOpenOk = false
+    private var lastWinLog = 0L
+    private var sliderTry = 0
 
-    // منو در ثانیه‌ی ۱ درخواست می‌شود؛ از ۲.۴ ثانیگی به بعد «آماده‌ی حرکت» است
-    private var menuReadyAt = 0L
-
-    // هر لحظه فقط یک ژست؛ ژست بعدی تا پایان کامل ژست فعلی شروع نمی‌شود
+    // ⚠️ هر لحظه فقط یک ژست؛ ژست بعدی تا «پایان کامل» ژست فعلی شروع نمی‌شود
     @Volatile
     private var gestureBusy = false
     private var gestureStartedAt = 0L
@@ -79,9 +83,11 @@ class LockAccessibilityService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!powerMenuPending) return
-        if (event?.packageName?.toString() != "com.android.systemui") return
+        val p = event?.packageName?.toString() ?: return
+        // منوی HyperOS رویدادهایش از miui.systemui.plugin می‌آید
+        if (p != "com.android.systemui" && p != "miui.systemui.plugin") return
         val now = SystemClock.elapsedRealtime()
-        if (gestureBusy || now < menuReadyAt || now - lastAttemptAt < 1000) return
+        if (gestureBusy || now - lastAttemptAt < 1000) return
         tryScan()
     }
 
@@ -101,18 +107,17 @@ class LockAccessibilityService : AccessibilityService() {
         attemptNo = 0
         reOpenCount = 0
         dumpedTree = false
-        dumpedWindows = false
-        statusBarSkips = 0
+        menuSeen = false
+        menuOpenOk = false
+        lastWinLog = 0
+        sliderTry = 0
         gestureBusy = false
         sessionStart = SystemClock.elapsedRealtime()
-        menuReadyAt = sessionStart + 2400L
 
         ShutdownLog.clear(this)
-        val w = resources.displayMetrics.widthPixels
-        val h = resources.displayMetrics.heightPixels
-        log("SESSION ${w}x${h} — menu request at 1.0s, actions from 2.4s, fallback=25s")
+        log("SESSION start (fallback=25s)")
 
-        // بیدار کردن صفحه
+        // مرحله ۱: بیدار کردن صفحه
         try {
             val pm = getSystemService(POWER_SERVICE) as PowerManager
             if (!pm.isInteractive) {
@@ -126,27 +131,28 @@ class LockAccessibilityService : AccessibilityService() {
             }
         } catch (_: Exception) { }
 
-        // باز کردن منوی پاور
+        // مرحله ۲: باز کردن منوی پاور
         handler.removeCallbacks(scanTick)
         handler.postDelayed({
             if (powerMenuPending) {
                 val ok = performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+                menuOpenOk = ok
                 log("MENU open requested, ret=$ok")
             }
         }, 1000)
 
-        // تیک دوره‌ای — شروع بعد از آماده‌شدن منو
-        handler.postDelayed(scanTick, 2550)
+        // مرحله ۳: تیک دوره‌ای — هر تلاش فقط بعد از پایان کامل ژست قبلی
+        handler.postDelayed(scanTick, 2100)
 
-        // جستجوی دیالوگ تأیید جداگانه
+        // مرحله ۴: جستجوی دیالوگ تأیید جداگانه (منوهایی که بعد از انتخاب، تأیید می‌خواهند)
         val confirmTimes = longArrayOf(
-            3200, 4200, 5200, 6200, 7200, 8200, 9200, 10200, 11200, 12400, 14000, 16000, 18000, 20000
+            2600, 3600, 4600, 5600, 6600, 7600, 8600, 9600, 10600, 11600, 13000, 15000, 17000, 19000
         )
         for (t in confirmTimes) {
             handler.postDelayed({ if (powerMenuPending) scanForConfirm() }, t)
         }
 
-        // حالت امن — قفل صفحه
+        // مرحله ۵: حالت امن — قفل صفحه
         handler.postDelayed({
             if (powerMenuPending) {
                 powerMenuPending = false
@@ -167,13 +173,12 @@ class LockAccessibilityService : AccessibilityService() {
                 log("BUSY stale -> released")
             }
             if (!gestureBusy) tryScan()
-            handler.postDelayed(this, 1150)
+            handler.postDelayed(this, 1100)
         }
     }
 
     private fun tryScan() {
         if (!powerMenuPending || gestureBusy) return
-        if (SystemClock.elapsedRealtime() < menuReadyAt) return
         lastAttemptAt = SystemClock.elapsedRealtime()
         val attempt = attemptNo
         attemptNo++
@@ -182,124 +187,178 @@ class LockAccessibilityService : AccessibilityService() {
 
     private fun scanAndAct(attempt: Int) {
         if (!powerMenuPending) return
+        val root = findSystemUiRoot()
 
-        val root = findMenuRoot()
-        var powerNode: AccessibilityNodeInfo? = null
-        var nodeRect: Rect? = null
-        var restartRect: Rect? = null
+        if (root == null) {
+            log("SCAN#$attempt root=NULL (menu not visible)")
+            logWindows(attempt)
+            // بیمه: اگر درخواست اولیه‌ی منو شکست خورده باشد، دو بار دیگر می‌خواهیم
+            if (!menuSeen && !menuOpenOk && attempt >= 1 && reOpenCount < 2) {
+                reOpenCount++
+                val ok = performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
+                if (ok) menuOpenOk = true
+                menuSeen = false
+                log("MENU re-open #$reOpenCount ret=$ok")
+            }
+            return
+        }
+        try { root.refresh() } catch (_: Exception) { }
+        menuSeen = true
+        log("SCAN#$attempt root pkg=${root.packageName}")
 
-        if (root != null) {
-            try { root.refresh() } catch (_: Exception) { }
-            log("SCAN#$attempt menu root READABLE")
-            if (!dumpedTree) {
-                dumpedTree = true
-                dumpTree(root)
-            }
-            powerNode = findNodeByKeywords(root, POWER_OFF_KEYWORDS)
-            if (powerNode != null) {
-                nodeRect = Rect()
-                powerNode.getBoundsInScreen(nodeRect)
-                log(
-                    "NODE PWR '${labelOf(powerNode)}' rect=$nodeRect cls=${powerNode.className} " +
-                        "click=${powerNode.isClickable} longClick=${powerNode.isLongClickable}"
-                )
-            } else {
-                val rNode = findNodeByKeywords(root, RESTART_KEYWORDS)
-                if (rNode != null) {
-                    restartRect = Rect()
-                    rNode.getBoundsInScreen(restartRect)
-                    log("NODE RST rect=$restartRect")
-                }
-            }
-        } else {
-            logWindowsOnce()
+        if (!dumpedTree) {
+            dumpedTree = true
+            dumpTree(root)
         }
 
-        // ⚠️ کلیدِ نسخه‌ی ۱.۱۳: حرکت‌ها مستقل از «خوانا بودن منو» اجرا می‌شوند
-        val p = powerNode
-        val r = nodeRect
-        if (p != null && r != null) {
-            runNodeStrategy(attempt, p, r)
-        } else {
-            runBlindStrategy(attempt)
+        // ۱) اولویت اول: اسلایدر — کنترل واقعی خاموشی در HyperOS
+        val slider = findNodeByKeywords(root, SLIDER_KEYWORDS)
+        if (slider != null) {
+            val r = Rect()
+            slider.getBoundsInScreen(r)
+            log("SLIDER node '${labelOf(slider)}' rect=$r")
+            runSlider(r)
+            return
         }
 
-        // بیمه: اگر تا نیمه‌ی راه منوی خوانایی ندیدیم، دو بار دیگر درخواست منو می‌دهیم
-        if (root == null && (attempt == 8 || attempt == 16) && reOpenCount < 2) {
-            reOpenCount++
-            performGlobalAction(GLOBAL_ACTION_POWER_DIALOG)
-            log("MENU re-open #$reOpenCount (insurance)")
+        // ۲) نود واقعی «خاموش کردن»
+        val powerNode = findNodeByKeywords(root, POWER_OFF_KEYWORDS)
+        if (powerNode != null) {
+            val rect = Rect()
+            powerNode.getBoundsInScreen(rect)
+            log(
+                "NODE PWR '${labelOf(powerNode)}' cls=${powerNode.className} " +
+                    "rect=$rect click=${powerNode.isClickable} longClick=${powerNode.isLongClickable}"
+            )
+            runStrategy(attempt, powerNode, rect, null)
+            return
+        }
+
+        // ۳) لنگر ری‌استارت (دستگیره/اسلایدر معمولاً نزدیک آن است)
+        val restartNode = findNodeByKeywords(root, RESTART_KEYWORDS)
+        if (restartNode != null) {
+            val r = Rect()
+            restartNode.getBoundsInScreen(r)
+            log(
+                "NODE RST '${labelOf(restartNode)}' cls=${restartNode.className} " +
+                    "rect=$r click=${restartNode.isClickable} longClick=${restartNode.isLongClickable}"
+            )
+            runStrategy(attempt, null, null, r)
+            return
+        }
+
+        // ۴) هیچ متنی پیدا نشد → حرکت کور
+        log("SCAN#$attempt no text node found -> blind strategy")
+        runStrategy(attempt, null, null, null)
+    }
+
+    /**
+     * ⭐ فیکس اصلی: درگ واقعی روی مستطیلِ اسلایدر.
+     * ۸ اسلات: نقطه‌ی شروع مختلف داخل اسلایدر + طول‌های مختلف، همیشه به بالا.
+     */
+    private fun runSlider(rect: Rect) {
+        val w = resources.displayMetrics.widthPixels
+        val h = resources.displayMetrics.heightPixels
+        if (w <= 0 || h <= 0) return
+        val x = rect.exactCenterX().coerceIn(0f, w.toFloat())
+        val rh = rect.height().toFloat().coerceAtLeast(60f)
+        val slot = sliderTry % 8
+        val startY = when (slot % 4) {
+            0 -> rect.bottom - 20f
+            1 -> rect.exactCenterY()
+            2 -> rect.top + rh * 0.25f
+            else -> rect.bottom - rh * 0.15f
+        }
+        // طول درگ ۱ تا ۲.۵ برابر ارتفاع اسلایدر — همیشه به بالا
+        val dragLen = rh * (1.0f + (sliderTry % 4) * 0.5f)
+        val endY = (startY - dragLen).coerceAtLeast(60f)
+        log("SLIDER try#$sliderTry slot=$slot x=${x.toInt()} from=${startY.toInt()} to=${endY.toInt()}")
+        sliderTry++
+        when {
+            slot >= 6 -> holdThenSlide(x, startY, x, endY, 350L, 750L)
+            slot % 2 == 0 -> dragFromTo(x, startY, x, endY, 800L)
+            else -> dragFromTo(x, startY, x, endY, 1100L)
         }
     }
 
-    /** مسیر رام‌های خوانا: عملیات روی خودِ نود واقعی */
-    private fun runNodeStrategy(attempt: Int, node: AccessibilityNodeInfo, rect: Rect) {
+    /** چرخه‌ی همه‌روش‌ها: هر نوبت یک استراتژی؛ هیچ حرکتی به پایین نیست (ری‌استارت نشود) */
+    private fun runStrategy(attempt: Int, powerNode: AccessibilityNodeInfo?, rect: Rect?, restartRect: Rect?) {
+        val w = resources.displayMetrics.widthPixels
         val h = resources.displayMetrics.heightPixels
-        val cx = rect.exactCenterX()
-        val cy = rect.exactCenterY()
-        when (attempt % 5) {
-            0 -> {
-                val c = findClickableSelfOrAncestor(node)
-                val ok = try { c?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false } catch (_: Exception) { false }
-                log("NODE-CLICK ret=$ok")
-                if (ok) return
-                val tapped = tapAt(cx, cy, 70)
-                if (tapped == true) return
+        if (w <= 0 || h <= 0) return
+        val slot = attempt % 16
+        val cx = rect?.exactCenterX() ?: (w * 0.5f)
+        val cy = rect?.exactCenterY() ?: (h * 0.42f)
+
+        when (slot) {
+            0 -> { // کلیک استاندارد (منوهای دکمه‌ای)
+                if (powerNode != null) {
+                    val c = findClickableSelfOrAncestor(powerNode)
+                    val ok = c?.performAction(AccessibilityNodeInfo.ACTION_CLICK) ?: false
+                    log("ACT#$slot NODE-CLICK ret=$ok")
+                    if (ok) return
+                    val tapped = tapAt(cx, cy, 70)
+                    log("ACT#$slot TAP node ret=$tapped")
+                    if (tapped == true) return
+                } else {
+                    val tapped = tapAt(w * 0.5f, h * 0.42f, 70)
+                    log("ACT#$slot TAP blind ret=$tapped")
+                    if (tapped == true) return
+                }
                 dragAnchored(rect, attempt)
             }
-            1 -> {
-                val ok = try { node.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) } catch (_: Exception) { false }
-                log("NODE-LONGCLICK ret=$ok")
-                if (ok) return
-                val c = findClickableSelfOrAncestor(node)
-                val ok2 = try { c?.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) ?: false } catch (_: Exception) { false }
-                log("PARENT-LONGCLICK ret=$ok2")
-                if (ok2) return
-                longPressAt(cx, cy, 800)
+            1 -> { // LONG_CLICK نرم‌افزاری (منوهای نگه‌داشتن)
+                if (powerNode != null) {
+                    val ok = try { powerNode.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) } catch (_: Exception) { false }
+                    log("ACT#$slot NODE-LONGCLICK ret=$ok")
+                    if (ok) return
+                    val c = findClickableSelfOrAncestor(powerNode)
+                    val ok2 = try { c?.performAction(AccessibilityNodeInfo.ACTION_LONG_CLICK) ?: false } catch (_: Exception) { false }
+                    log("ACT#$slot PARENT-LONGCLICK ret=$ok2")
+                    if (ok2) return
+                }
+                longPressAt(w * 0.5f, h * 0.40f, 800)
             }
-            2 -> longPressAt(cx, cy, 700)
+            2 -> longPressAt(cx, cy, 700) // فشار طولانی واقعی روی مرکز نود
             3 -> dragAnchored(rect, attempt)
-            else -> holdThenSlide(cx, cy, cx, (h * 0.12f).coerceAtLeast(80f), 450L, 850L)
+            4 -> dragAnchored(rect, attempt)
+            5 -> dragAnchored(rect, attempt)
+            6 -> dragAnchored(rect, attempt)
+            7 -> holdThenSlide(cx, cy, cx, (h * 0.12f).coerceAtLeast(80f), 450L, 850L)
+            8 -> { // از بالای برچسب ری‌استارت (دستگیره معمولاً همان‌جاست)
+                if (restartRect != null) {
+                    val sx = restartRect.exactCenterX()
+                    val sy = (restartRect.top - 150f).coerceAtLeast(200f)
+                    dragFromTo(sx, sy, sx, (h * 0.15f).coerceAtLeast(80f), 950L)
+                } else {
+                    dragFromTo(w * 0.5f, h * 0.52f, w * 0.5f, (h * 0.14f).coerceAtLeast(80f), 950L)
+                }
+            }
+            9 -> dragFromTo(w * 0.5f, h * 0.46f, w * 0.5f, (h * 0.12f).coerceAtLeast(80f), 950L)
+            10 -> dragFromTo(w * 0.5f, h * 0.54f, w * 0.5f, (h * 0.12f).coerceAtLeast(80f), 950L)
+            11 -> longPressAt(cx, cy, 900)
+            12 -> dragFromTo(w * 0.5f, h * 0.62f, w * 0.5f, (h * 0.12f).coerceAtLeast(80f), 950L)
+            13 -> holdThenSlide(cx, cy, cx, (h * 0.10f).coerceAtLeast(80f), 700L, 800L)
+            14 -> dragFromTo(w * 0.5f, h * 0.50f, w * 0.5f, (h * 0.09f).coerceAtLeast(80f), 1100L)
+            else -> dragFromTo(w * 0.5f, h * 0.42f, w * 0.5f, (h * 0.09f).coerceAtLeast(80f), 1100L)
         }
     }
 
     /**
-     * مسیر اصلیِ 11T Pro: حرکتِ کور روی ناحیه‌ی آیکون خاموشی.
-     * چیدمان HyperOS: آیکون‌ها در ستون میانی (x=0.5w)؛ خاموشی بالاتر از ری‌استارت.
-     * پس همه‌ی حرکات در ستون میانی و نوار ۰.۳۴ تا ۰.۵۰ ارتفاع است — هیچ حرکتی
-     * به ناحیه‌ی پایین (ری‌استارت) نمی‌رود. چرخه‌ی ۱۶تایی تا ۲۵ ثانیه تکرار می‌شود.
+     * کشیدنِ لنگرشده روی برچسب «خاموش کردن»: ۴ حالت شروع (روی متن، زیر متن، پایین‌تر،
+     * بالای متن) — پایان‌ها بین ۹ تا ۲۰ درصد ارتفاع (ناحیه‌ی رهاسازی). فقط به بالا.
      */
-    private fun runBlindStrategy(attempt: Int) {
-        val w = resources.displayMetrics.widthPixels
-        val h = resources.displayMetrics.heightPixels
-        if (w <= 0 || h <= 0) return
-        val xC = w * 0.5f
-        val slot = attempt % 16
-
-        when (slot) {
-            0 -> tapAt(xC, h * 0.40f, 80)
-            1 -> longPressAt(xC, h * 0.40f, 800)
-            2 -> longPressAt(xC, h * 0.40f, 1200)
-            3 -> dragFromTo(xC, h * 0.42f, xC, (h * 0.14f).coerceAtLeast(80f), 950L)
-            4 -> holdThenSlide(xC, h * 0.42f, xC, (h * 0.14f).coerceAtLeast(80f), 450L, 850L)
-            5 -> tapAt(xC, h * 0.36f, 80)
-            6 -> longPressAt(xC, h * 0.36f, 900)
-            7 -> dragFromTo(xC, h * 0.38f, xC, (h * 0.12f).coerceAtLeast(80f), 1000L)
-            8 -> tapAt(xC, h * 0.44f, 80)
-            9 -> longPressAt(xC, h * 0.44f, 900)
-            10 -> dragFromTo(xC, h * 0.46f, xC, (h * 0.14f).coerceAtLeast(80f), 950L)
-            11 -> holdThenSlide(xC, h * 0.38f, xC, (h * 0.10f).coerceAtLeast(80f), 700L, 800L)
-            12 -> longPressAt(xC, h * 0.40f, 1500)
-            13 -> dragFromTo(xC, h * 0.40f, xC, (h * 0.09f).coerceAtLeast(80f), 1200L)
-            14 -> dragFromTo(w * 0.62f, h * 0.40f, w * 0.18f, h * 0.40f, 800L) // اسلایدر افقیِ راست‌به‌چپ
-            else -> dragFromTo(xC, h * 0.34f, xC, (h * 0.08f).coerceAtLeast(80f), 1000L)
-        }
-    }
-
-    /** کشیدنِ لنگرشده روی نود واقعی (رام‌های خوانا) — ۴ حالت شروع، فقط به بالا */
-    private fun dragAnchored(label: Rect, attempt: Int) {
+    private fun dragAnchored(label: Rect?, attempt: Int) {
         val h = resources.displayMetrics.heightPixels
         if (h <= 0) return
+        if (label == null || label.isEmpty) {
+            // بدون برچسب: جارو از نوار میانی
+            val ratios = floatArrayOf(0.42f, 0.50f, 0.58f, 0.66f)
+            val sy = h * ratios[attempt % ratios.size]
+            dragFromTo(resources.displayMetrics.widthPixels * 0.5f, sy,
+                resources.displayMetrics.widthPixels * 0.5f, (h * 0.12f).coerceAtLeast(80f), 950L)
+            return
+        }
         val cx = label.exactCenterX()
         when (attempt % 4) {
             0 -> dragFromTo(cx, label.bottom + 90f, cx, (h * 0.20f).coerceAtLeast(80f), 950L)
@@ -321,7 +380,7 @@ class LockAccessibilityService : AccessibilityService() {
             val gesture = GestureDescription.Builder()
                 .addStroke(GestureDescription.StrokeDescription(path, 0L, durationMs))
                 .build()
-            log("ACT LPGESTURE (${x.toInt()},${y.toInt()}) ${durationMs}ms")
+            log("ACT LPGESTURE (${x.toInt()},${y.toInt()}), ${durationMs}ms")
             dispatchSerialized(gesture, "LPGESTURE")
         } catch (_: Exception) {
             gestureBusy = false
@@ -329,7 +388,10 @@ class LockAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** «نگه‌دار و بکش» واقعی: فشار با willContinue، بعد ادامه‌ی همان انگشت به بالا */
+    /**
+     * «نگه‌دار و بکش» واقعی: مرحله‌ی اول فشار با willContinue=true؛ بعد از پایان،
+     * همان انگشت با continueStroke به سمت بالا ادامه پیدا می‌کند (بدون بلندشدن).
+     */
     private fun holdThenSlide(sx: Float, sy: Float, ex: Float, ey: Float, holdMs: Long, dragMs: Long): Boolean {
         return try {
             val w = resources.displayMetrics.widthPixels
@@ -410,7 +472,7 @@ class LockAccessibilityService : AccessibilityService() {
         }
     }
 
-    /** اجرای محافظت‌شده: تا ژست قبلی تمام نشود، ژست جدیدی فرستاده نمی‌شود */
+    /** اجرای محافظت‌شده: تا ژست قبلی تمام نشود ژست جدیدی فرستاده نمی‌شود؛ نتیجه در گزارش ثبت می‌شود */
     private fun dispatchSerialized(gesture: GestureDescription, tag: String): Boolean {
         return try {
             gestureBusy = true
@@ -443,102 +505,29 @@ class LockAccessibilityService : AccessibilityService() {
     }
 
     /**
-     * دیالوگ تأییدِ واقعی: در «همه‌ی» پنجره‌ها دنبالش می‌گردیم (بعضی دیالوگ‌ها
-     * پکیج غیر systemui دارند). اگر برچسب ری‌استارت همان‌جا باشد یعنی منوی اصلی است.
+     * جستجوی دیالوگ تأیید واقعی: اگر «ری‌استارت» هم همان‌جاست یعنی منوی اصلی است و کاری نمی‌کنیم
      */
     private fun scanForConfirm() {
         if (!powerMenuPending || gestureBusy) return
-        try {
-            for (window in windows) {
-                val root = window.root ?: continue
-                try { root.refresh() } catch (_: Exception) { }
-                if (findNodeByKeywords(root, RESTART_KEYWORDS) != null) continue
-                val node = findNodeByKeywords(root, CONFIRM_KEYWORDS) ?: continue
-                val clickable = findClickableSelfOrAncestor(node) ?: continue
-                val ok = try { clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK) } catch (_: Exception) { false }
-                log("CONFIRM click ret=$ok")
-                if (ok) {
-                    powerMenuPending = false
-                    handler.removeCallbacks(scanTick)
-                    return
-                }
-                val rect = Rect()
-                node.getBoundsInScreen(rect)
-                if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60) == true) {
-                    powerMenuPending = false
-                    handler.removeCallbacks(scanTick)
-                }
-                return
-            }
-        } catch (_: Exception) { }
-    }
+        val root = findSystemUiRoot() ?: return
+        try { root.refresh() } catch (_: Exception) { }
 
-    /** پنجره‌ی systemui فقط اگر «بزرگ» باشد — نوار وضعیت (بلندای ~۸۴px) قبول نمی‌شود */
-    private fun findMenuRoot(): AccessibilityNodeInfo? {
-        return try {
-            val h = resources.displayMetrics.heightPixels
-            for (window in windows) {
-                val root = window.root ?: continue
-                if (root.packageName?.toString() != "com.android.systemui") continue
-                val r = Rect()
-                root.getBoundsInScreen(r)
-                if (r.height() >= h * 0.30f) return root
-                if (statusBarSkips < 2) {
-                    statusBarSkips++
-                    log("SYSUI small root h=${r.height()}px — نوار وضعیت است نه منو -> skipped")
-                }
-            }
-            null
-        } catch (_: Exception) {
-            null
+        if (findNodeByKeywords(root, RESTART_KEYWORDS) != null) return
+        val node = findNodeByKeywords(root, CONFIRM_KEYWORDS) ?: return
+        val clickable = findClickableSelfOrAncestor(node) ?: return
+        val ok = try { clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK) } catch (_: Exception) { false }
+        log("CONFIRM click ret=$ok")
+        if (ok) {
+            powerMenuPending = false
+            handler.removeCallbacks(scanTick)
+            return
         }
-    }
-
-    /** یک‌بار بعد از آماده‌شدن منو: فهرست پنجره‌های قابل‌دیدن را ثبت می‌کنیم */
-    private fun logWindowsOnce() {
-        if (dumpedWindows) return
-        dumpedWindows = true
-        try {
-            val sb = StringBuilder()
-            for (window in windows) {
-                val r = window.root
-                if (r != null) {
-                    val b = Rect()
-                    r.getBoundsInScreen(b)
-                    sb.append("${r.packageName}[").append(b.height()).append("px] ")
-                }
-            }
-            log("WINDOWSCAN after menuReady: $sb")
-        } catch (_: Exception) { }
-    }
-
-    /** درخت پنجره‌ی منوی خوانا — فقط وقتی منو خوانا باشد اجرا می‌شود */
-    private fun dumpTree(root: AccessibilityNodeInfo) {
-        try {
-            val queue = ArrayDeque<AccessibilityNodeInfo>()
-            queue.add(root)
-            var checked = 0
-            var logged = 0
-            while (queue.isNotEmpty() && logged < 26 && checked < 260) {
-                val node = queue.removeFirst()
-                checked++
-                val t = node.text?.toString()?.take(24) ?: ""
-                val cd = node.contentDescription?.toString()?.take(24) ?: ""
-                if (t.isNotEmpty() || cd.isNotEmpty() || node.isClickable || logged < 12) {
-                    val r = Rect()
-                    node.getBoundsInScreen(r)
-                    log(
-                        "TREE cls=${node.className} t='$t' cd='$cd' rect=$r " +
-                            "click=${node.isClickable} longClick=${node.isLongClickable}"
-                    )
-                    logged++
-                }
-                for (i in 0 until node.childCount) {
-                    val child = try { node.getChild(i) } catch (_: Exception) { null }
-                    if (child != null) queue.add(child)
-                }
-            }
-        } catch (_: Exception) { }
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
+        if (tapAt(rect.exactCenterX(), rect.exactCenterY(), 60) == true) {
+            powerMenuPending = false
+            handler.removeCallbacks(scanTick)
+        }
     }
 
     private fun findNodeByKeywords(
@@ -591,11 +580,97 @@ class LockAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** درخت پنجره‌ی منو + فهرست پنجره‌ها — نقشه‌ی واقعی گوشی کاربر برای اشکال‌زدایی */
+    private fun dumpTree(root: AccessibilityNodeInfo) {
+        try {
+            var winCount = 0
+            val pkgs = StringBuilder()
+            for (window in windows) {
+                winCount++
+                pkgs.append(window.root?.packageName).append(' ')
+            }
+            log("WINDOWS count=$winCount pkgs=$pkgs")
+
+            val queue = ArrayDeque<AccessibilityNodeInfo>()
+            queue.add(root)
+            var checked = 0
+            var logged = 0
+            while (queue.isNotEmpty() && logged < 24 && checked < 250) {
+                val node = queue.removeFirst()
+                checked++
+                val t = node.text?.toString()?.take(22) ?: ""
+                val cd = node.contentDescription?.toString()?.take(22) ?: ""
+                if (t.isNotEmpty() || cd.isNotEmpty() || node.isClickable || logged < 12) {
+                    val r = Rect()
+                    node.getBoundsInScreen(r)
+                    log(
+                        "TREE cls=${node.className} t='$t' cd='$cd' rect=$r " +
+                            "click=${node.isClickable} longClick=${node.isLongClickable} scroll=${node.isScrollable}"
+                    )
+                    logged++
+                }
+                for (i in 0 until node.childCount) {
+                    val child = try { node.getChild(i) } catch (_: Exception) { null }
+                    if (child != null) queue.add(child)
+                }
+            }
+        } catch (_: Exception) { }
+    }
+
     private fun labelOf(node: AccessibilityNodeInfo): String =
         (node.text?.toString() ?: node.contentDescription?.toString() ?: "").take(24)
 
     private fun log(line: String) {
         val t = if (sessionStart == 0L) 0L else SystemClock.elapsedRealtime() - sessionStart
         ShutdownLog.append(this, "+${t}ms $line")
+    }
+
+    /**
+     * ⭐ فیکس اصلی v1.14: منو با «محتوا» شناسایی می‌شود نه با پکیج.
+     * روی HyperOS پکیج منو «miui.systemui.plugin» است — فیلتر پکیجیِ قدیمی آن را
+     * رد می‌کرد. حالا: پنجره‌های خودِ برنامه و لانچر رد می‌شوند و هر پنجره‌ای که
+     * درختش برچسب خاموش‌کردن یا ری‌استارت دارد، منوی پاور است. پشتیبان: هر پنجره‌ی
+     * systemui با ارتفاع ≥۳۰٪ صفحه (برای رام‌هایی که لیبل ندارند).
+     */
+    private fun findSystemUiRoot(): AccessibilityNodeInfo? {
+        return try {
+            val h = resources.displayMetrics.heightPixels
+            val b = Rect()
+            var bigSystemUi: AccessibilityNodeInfo? = null
+            for (window in windows) {
+                val root = window.root ?: continue
+                val pkg = root.packageName?.toString() ?: continue
+                if (pkg == packageName) continue      // پنجره‌های خودِ برنامه
+                if (pkg == "com.miui.home") continue  // لانچر MIUI
+                if (pkg.contains("launcher")) continue // هر لانچر دیگری
+                // شناسایی با محتوا — هر پکیجی
+                if (findNodeByKeywords(root, POWER_OFF_KEYWORDS) != null) return root
+                if (findNodeByKeywords(root, RESTART_KEYWORDS) != null) return root
+                // پشتیبان: پنجره‌ی بزرگ systemui (بدون لیبل)
+                if (pkg.contains("systemui")) {
+                    try { root.getBoundsInScreen(b) } catch (_: Exception) { }
+                    if (b.height() >= h * 0.30f) bigSystemUi = root
+                }
+            }
+            bigSystemUi
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** وقتی منو دیده نمی‌شود، هر ۳ ثانیه فهرست پنجره‌ها ثبت می‌شود (برای گزارش) */
+    private fun logWindows(attempt: Int) {
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastWinLog < 3000) return
+        lastWinLog = now
+        try {
+            var count = 0
+            val pkgs = StringBuilder()
+            for (window in windows) {
+                count++
+                pkgs.append(window.root?.packageName).append(' ')
+            }
+            log("WINDOWS count=$count pkgs=$pkgs (attempt=$attempt)")
+        } catch (_: Exception) { }
     }
 }
