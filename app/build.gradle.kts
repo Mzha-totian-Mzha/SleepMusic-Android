@@ -15,7 +15,21 @@ android {
         versionName = "1.15"
     }
 
+    // امضای ثابت برای بیلدهای debug — همین keystore در ریپو commit شده تا بیلد گیت‌هاب
+    // هم دقیقاً با همین امضا ساخته شود و APK هر نسخه روی نسخه‌ی قبلی نصب شود
+    signingConfigs {
+        getByName("debug") {
+            storeFile = rootProject.file("keystore/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             isMinifyEnabled = false
         }

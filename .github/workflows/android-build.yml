@@ -5,6 +5,10 @@ on:
     branches: [ main, master ]
   workflow_dispatch:
 
+# برای ساختن Release و آپلود APK روی آن، دسترسی نوشتن لازم است
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,8 +30,44 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --no-daemon
 
-      - name: Upload APK
+      - name: Read version from build.gradle.kts
+        id: ver
+        run: |
+          VN=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts | head -1)
+          VC=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts | head -1)
+          echo "name=$VN" >> "$GITHUB_OUTPUT"
+          echo "code=$VC" >> "$GITHUB_OUTPUT"
+          echo "version=$VN (code $VC)"
+
+      - name: Rename APK
+        run: cp app/build/outputs/apk/debug/app-debug.apk "KhabMusic-v${{ steps.ver.outputs.name }}.apk"
+
+      - name: Upload APK artifact (backup)
         uses: actions/upload-artifact@v4
         with:
           name: SleepMusic-APK
           path: app/build/outputs/apk/debug/app-debug.apk
+
+      # Release خودکار: اگر Release این نسخه وجود نداشت می‌سازد،
+      # اگر بود فقط APK آن را با بیلد جدید جایگزین می‌کند (--clobber)
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VN: ${{ steps.ver.outputs.name }}
+          VC: ${{ steps.ver.outputs.code }}
+        run: |
+          TAG="v${VN}"
+          APK="KhabMusic-v${VN}.apk"
+          TITLE="نسخه ${VN} — بیلد خودکار گیت‌هاب"
+          NOTES="خودکار ساخته شد — نسخه ${VN} (versionCode ${VC}) از کامیت ${GITHUB_SHA::7}.
+
+📦 **نصب:** دانلود KhabMusic-v${VN}.apk و نصب مستقیم روی نسخه‌ی قبلی (بدون پاک کردن)."
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $TAG exists — replacing asset"
+            gh release upload "$TAG" "$APK" -R "$GITHUB_REPOSITORY" --clobber
+          else
+            echo "Release $TAG not found — creating"
+            gh release create "$TAG" "$APK" -R "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "$TITLE" --notes "$NOTES"
+          fi
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json tagName,assets --jq '{tag: .tagName, assets: [.assets[].name]}'
