@@ -59,9 +59,7 @@ jobs:
           TAG="v${VN}"
           APK="KhabMusic-v${VN}.apk"
           TITLE="نسخه ${VN} — بیلد خودکار گیت‌هاب"
-          NOTES="خودکار ساخته شد — نسخه ${VN} (versionCode ${VC}) از کامیت ${GITHUB_SHA::7}.
-
-📦 **نصب:** دانلود KhabMusic-v${VN}.apk و نصب مستقیم روی نسخه‌ی قبلی (بدون پاک کردن)."
+          NOTES="خودکار ساخته شد — نسخه ${VN} (versionCode ${VC}) از کامیت ${GITHUB_SHA::7}. 📦 نصب: دانلود KhabMusic-v${VN}.apk و نصب مستقیم روی نسخه‌ی قبلی (بدون پاک کردن)."
           if gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "Release $TAG exists — replacing asset"
             gh release upload "$TAG" "$APK" -R "$GITHUB_REPOSITORY" --clobber
