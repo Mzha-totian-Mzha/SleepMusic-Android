@@ -118,7 +118,7 @@ object AlertOverlay {
 
     private fun startCountdown(wm: WindowManager, v: View, title: TextView, bar: View?) {
         bar?.scaleX = 1f
-        bar?.pivotX = 0f
+        // نوار از دو طرف به‌طور متقارن به وسط کم می‌شود (pivot پیش‌فرض = وسط نوار)
         val runnable = object : Runnable {
             override fun run() {
                 if (view == null || v !== view) return

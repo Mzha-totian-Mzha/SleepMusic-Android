@@ -512,7 +512,7 @@ class MainActivity : AppCompatActivity() {
         refreshPills()
 
         // خط دور همه ردیف‌ها + رنگ دایره‌های شماره از خود تم (دیگر بنفش ثابت نیست)
-        for (rowId in intArrayOf(R.id.rowTheme, R.id.rowPlaylist, R.id.rowMusic, R.id.rowAlert, R.id.rowStats, R.id.rowNight, R.id.rowReport)) {
+        for (rowId in intArrayOf(R.id.rowTheme, R.id.rowPlaylist, R.id.rowMusic, R.id.rowAlert, R.id.rowStats, R.id.rowNight)) {
             val row = dialog.findViewById<LinearLayout>(rowId)
             row.background = roundRectStroke(Color.WHITE, dp(18f))
             (row.getChildAt(0) as? TextView)?.background = ovalGradient(theme.btnColors)
@@ -547,92 +547,7 @@ class MainActivity : AppCompatActivity() {
             refreshPills()
             maybeRefreshNightTheme()
         }
-        dialog.findViewById<LinearLayout>(R.id.rowReport).setOnClickListener {
-            dialog.dismiss()
-            showShutdownReportDialog()
-        }
         dialog.findViewById<TextView>(R.id.btnCloseSettings).setOnClickListener { dialog.dismiss() }
-        dialog.show()
-    }
-
-    /* ================= پنجره گزارش خاموشی خودکار (عیب‌یابی) ================= */
-
-    /**
-     * گزارش فنیِ آخرین تلاش خاموشی خودکار را نشان می‌دهد (خروجی ShutdownLog).
-     * اگر خاموشی روی گوشی کاربر انجام نشود، همین گزارش را کپی و ارسال می‌کند
-     * تا مشکل از روی داده‌ی واقعی پیدا شود، نه حدس.
-     */
-    private fun showShutdownReportDialog() {
-        val dialog = Dialog(this)
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16f).toInt(), dp(16f).toInt(), dp(16f).toInt(), dp(16f).toInt())
-            background = roundRectStroke(Color.WHITE, dp(20f))
-        }
-
-        val title = TextView(this).apply {
-            text = "🩺 گزارش خاموشی خودکار"
-            textSize = 14f
-            setTextColor(0xFF1F2937.toInt())
-            gravity = android.view.Gravity.CENTER
-        }
-        root.addView(title, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ))
-
-        val tv = TextView(this).apply {
-            text = ShutdownLog.read(this@MainActivity)
-            textSize = 8.5f
-            setTextColor(0xFF374151.toInt())
-            textDirection = View.TEXT_DIRECTION_LTR
-            gravity = android.view.Gravity.START
-            setPadding(dp(8f).toInt(), dp(10f).toInt(), dp(8f).toInt(), dp(8f).toInt())
-        }
-        val scroll = android.widget.ScrollView(this).apply { addView(tv) }
-        scroll.layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, dp(320f).toInt()
-        ).apply { topMargin = dp(10f).toInt() }
-        root.addView(scroll)
-
-        val btnCopy = TextView(this).apply {
-            text = "📋 کپی گزارش"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            gravity = android.view.Gravity.CENTER
-            background = roundRectStroke(0xFF059669.toInt(), dp(20f))
-            setPadding(dp(20f).toInt(), dp(8f).toInt(), dp(20f).toInt(), dp(8f).toInt())
-        }
-        btnCopy.setOnClickListener {
-            try {
-                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                cm.setPrimaryClip(android.content.ClipData.newPlainText("khabmusic_shutdown_report", tv.text))
-                Toast.makeText(this, "گزارش کپی شد — برای من بفرستش", Toast.LENGTH_SHORT).show()
-            } catch (_: Exception) {
-                Toast.makeText(this, "کپی نشد؛ متن را دستی انتخاب کن", Toast.LENGTH_SHORT).show()
-            }
-        }
-        root.addView(btnCopy, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = android.view.Gravity.CENTER; topMargin = dp(12f).toInt() })
-
-        val btnClose = TextView(this).apply {
-            text = "بستن"
-            textSize = 11.5f
-            setTextColor(0xFF6B7280.toInt())
-            gravity = android.view.Gravity.CENTER
-            setPadding(dp(16f).toInt(), dp(8f).toInt(), dp(16f).toInt(), dp(8f).toInt())
-        }
-        btnClose.setOnClickListener { dialog.dismiss() }
-        root.addView(btnClose, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        ).apply { gravity = android.view.Gravity.CENTER; topMargin = dp(6f).toInt() })
-
-        dialog.setContentView(root)
-        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
-        dialog.window?.setLayout(
-            (resources.displayMetrics.widthPixels * 0.92f).toInt(),
-            ViewGroup.LayoutParams.WRAP_CONTENT
-        )
         dialog.show()
     }
 
@@ -948,7 +863,7 @@ class MainActivity : AppCompatActivity() {
             val bar = dialog.findViewById<View>(R.id.alertBar)
             alertBar = bar
             bar?.scaleX = 1f
-            bar?.pivotX = 0f
+            // نوار از دو طرف به‌طور متقارن به وسط کم می‌شود (pivot پیش‌فرض = وسط نوار)
             alertAnimator?.cancel()
             alertAnimator = android.animation.ValueAnimator.ofFloat(1f, 0f).apply {
                 duration = remainingMs.toLong().coerceAtLeast(1000L)

@@ -59,8 +59,7 @@ class MusicService : Service() {
     private var pauseWallRealtime = 0L
     // پایان محوشدن بر اساس ساعت واقعی — برای محاسبه حجم
     private var fadeEndRealtime = 0L
-    // اعلان هشدار الان روی نوار اعلان است؟ (برای برداشتنش وقتی اپ برگشت پیش‌زمینه)
-    private var alertNotifActive = false
+    // از نسخه‌ی ۱.۱۵: هشدار فقط «پاپ‌آپ» است؛ دیگر هیچ اعلانی برای خاموشی ساخته نمی‌شود
 
     // فوکوس صوتی: بعضی رام‌ها (مثل MIUI) بدون آن، صدا را درست مسیریابی نمی‌کنند
     private val focusListener = AudioManager.OnAudioFocusChangeListener { }
@@ -159,9 +158,7 @@ class MusicService : Service() {
     }
 
     /**
-     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
-     * پاپ‌آپ درون برنامه (همان تصویر تأییدشده) همیشه با برادکست نشان داده می‌شود؛
-     * اعلان قفل صفحه فقط وقتی ساخته می‌شود که اپ در پیش‌زمینه نیست.
+     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار (فقط پاپ‌آپ) + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
      * دو روش مستقل با هم چک می‌شوند تا حتی اگر mp3 طول را اشتباه گفت، باز هم فعال شود:
      *   ۱) موقعیت MediaPlayer نسبت به duration
      *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
@@ -171,10 +168,10 @@ class MusicService : Service() {
     }
 
     /**
-     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
+     * در ۱۰ ثانیه‌ی آخرِ آخرین آهنگ: هشدار (فقط پاپ‌آپ) + محو شدن صدا (اگر کاربر روشن گذاشته باشد).
      * هم تیکر و هم نگهبان مستقل این تابع را صدا می‌زنند؛ سپر alertSent جلوی دوباره‌کاری را می‌گیرد.
-     * پاپ‌آپ درون برنامه (همان تصویر تأییدشده) با برادکست + خواندن عدد زنده نشان داده می‌شود؛
-     * اعلان قفل صفحه هم همیشه ساخته می‌شود (مثل ۱.۶ که روی دستگاه کاربر کار می‌کرد).
+     * پاپ‌آپ (همان تصویر تأییدشده) با برادکست + خواندن عدد زنده + روکش سیستم نشان داده می‌شود؛
+     * از نسخه‌ی ۱.۱۵ هیچ اعلانی ساخته نمی‌شود — فقط پاپ‌آپ.
      * دو روش مستقل با هم چک می‌شوند تا حتی اگر mp3 طول را اشتباه گفت، باز هم فعال شود:
      *   ۱) موقعیت MediaPlayer نسبت به duration
      *   ۲) ساعت واقعی از لحظه‌ی شروع پخش (اگر position گیر کرد)
@@ -246,25 +243,14 @@ class MusicService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= 26) {
-            // کانال اعلان فوری: بالای صفحه و بالای قفل با صدا و لرزش — برای هشدار ۱۰ ثانیه‌ای
-            val alertChannel = NotificationChannel(
-                ALERT_CHANNEL_ID, "هشدار ۱۰ ثانیه‌ای خاموشی", NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "۱۰ ثانیه قبل از خاموش شدن گوشی صدا و لرزش دارد و بالای قفل نشان داده می‌شود"
-                enableVibration(true)
-                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
-            }
-            manager.createNotificationChannel(alertChannel)
-        }
+        // از نسخه‌ی ۱.۱۵: هشدار خاموشی فقط پاپ‌آپ است — هیچ اعلان و کانالی برای آن ساخته نمی‌شود
+        // هر اعلان قدیمی از نسخه‌های قبل با cancelAlertNotification() پاک می‌شود
     }
 
     /**
-     * هر نیم ثانیه چک می‌شود — عیناً مثل نسخه‌ی ۱.۶ که روی دستگاه واقعی کار می‌کرد:
+     * هر نیم ثانیه چک می‌شود:
      *   - عدد زنده‌ی هشدار در alertRemainingMs به‌روز می‌شود (تغذیه‌ی پاپ‌آپ صفحه‌ی اصلی)
-     *   - اعلان قفل صفحه همیشه ساخته و تازه می‌شود؛ دیگر به پیش‌زمینه بودن اپ ربطی ندارد
-     *     (در ۱.۷ اعلان فقط برای پس‌زمینه بود و اگر برادکست پاپ‌آپ گم می‌شد، هیچ‌چیز نمی‌آمد)
+     *   - از نسخه‌ی ۱.۱۵: دیگر هیچ اعلانی ساخته نمی‌شود — فقط پاپ‌آپ (روکش سیستم)
      */
     private fun handleAlertUi() {
         if (!alertSent || shutdownCancelled) return
@@ -277,57 +263,20 @@ class MusicService : Service() {
             return
         }
         MusicService.alertRemainingMs = remaining
-        buildAlertNotification(remaining)
     }
 
-    /** اعلان فوری بالای قفل: شمارش معکوس + دو دکمه «لغو خاموشی» و «خاموش کن» — همیشه نشان داده می‌شود */
-    private fun buildAlertNotification(remainingMs: Long) {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val secs = ((remainingMs + 999) / 1000).toInt()
-        val cancelIt = PendingIntent.getService(
-            this, 12,
-            Intent(this, MusicService::class.java).setAction(ACTION_CANCEL_SHUTDOWN),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val doNow = PendingIntent.getService(
-            this, 13,
-            Intent(this, MusicService::class.java).setAction(ACTION_SHUTDOWN_NOW),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val openApp = PendingIntent.getActivity(
-            this, 10,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-        val notification = NotificationCompat.Builder(this, ALERT_CHANNEL_ID)
-            .setContentTitle("⏰ " + faDigits("" + secs) + " ثانیه تا خاموش شدن گوشی")
-            .setContentText("صدای موسیقی کم می‌شود — اگر می‌خواهی بیداری، لغو کن")
-            .setSmallIcon(R.drawable.ic_launcher)
-            .setContentIntent(openApp)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .addAction(0, "لغو خاموشی", cancelIt)
-            .addAction(0, "خاموش کن", doNow)
-            .build()
-        alertNotifActive = true
-        try {
-            manager.notify(ALERT_NOTIF_ID, notification)
-        } catch (_: Exception) { }
-    }
-
+    /**
+     * پاک‌سازی کامل هشدار: پاپ‌آپ بسته می‌شود و اگر از نسخه‌های قبل اعلانی مانده باشد، حذف می‌شود.
+     * از نسخه‌ی ۱.۱۵ دیگر هیچ اعلان خاموشی‌ای ساخته نمی‌شود؛ این تابع فقط برای پاک‌کردن
+     * اعلان‌های باقی‌مانده‌ی نسخه‌های قدیمی و بستن پاپ‌آپ نگه داشته شده است.
+     */
     private fun cancelAlertNotification() {
         alertRemainingMs = 0
-        alertNotifActive = false
         // روکش سیستم پاپ‌آپ هم با هر پاک‌سازی بسته می‌شود (مکث/لغو/پایان/توقف)
         AlertOverlay.hide()
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         try { manager.cancel(ALERT_NOTIF_ID) } catch (_: Exception) { }
     }
-
-    private fun faDigits(s: String): String = ThemeRepo.faDigits(s)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -698,8 +647,8 @@ class MusicService : Service() {
         const val EXTRA_SEEK_MS = "extra_seek_ms"
         const val ALERT_ACTION = "ir.sleepmusic.app.TEN_SECOND_ALERT"
         const val CHANNEL_ID = "music_playback"
-        const val ALERT_CHANNEL_ID = "shutdown_alert"
         const val NOTIFICATION_ID = 1
+        // فقط برای پاک‌کردن اعلان‌های باقی‌مانده‌ی نسخه‌های قدیمی (دیگر اعلانی با این آی‌دی ساخته نمی‌شود)
         const val ALERT_NOTIF_ID = 2
 
         // وضعیت پخش برای نمایش زنده رقص نور و چیپ‌ها در اکتیویتی
